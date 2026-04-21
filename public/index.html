@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Field Ops"/>
+<meta name="theme-color" content="#ffffff"/>
+<title>Field Operations Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --bg:#fff;--bg2:#f5f5f7;--bg3:#ebebeb;
+  --text:#1d1d1f;--text2:#6e6e73;--text3:#aeaeb2;
+  --border:#d2d2d7;--border2:#e5e5ea;--accent:#1d1d1f;
+  --green-bg:#eaf3de;--green-t:#27500a;--green-b:#c0dd97;
+  --amber-bg:#faeeda;--amber-t:#633806;--amber-b:#fac775;
+  --red-bg:#fcebeb;--red-t:#a32d2d;--red-b:#f7c1c1;
+  --blue-bg:#e6f1fb;--blue-t:#185fa5;--blue-b:#b5d4f4;
+  --purple-bg:#f3edfb;--purple-t:#5b2d9e;--purple-b:#cdb8f0;
+  --teal-bg:#e1f5ee;--teal-t:#0f6e56;--teal-b:#5dcaa5;
+  --r:10px;--rs:7px;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1c1c1e;--bg2:#2c2c2e;--bg3:#3a3a3c;
+  --text:#f5f5f7;--text2:#aeaeb2;--text3:#6e6e73;
+  --border:#3a3a3c;--border2:#2c2c2e;
+  --green-bg:#1a2e0a;--green-t:#a8d87a;
+  --amber-bg:#2e1f0a;--amber-t:#f0b860;
+  --red-bg:#2e0a0a;--red-t:#f08080;
+  --blue-bg:#0a1e2e;--blue-t:#60a8f0;
+  --purple-bg:#1e0a2e;--purple-t:#c090f0;
+  --teal-bg:#0a2e1f;--teal-t:#5dcaa5;
+}}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
+body{display:flex;flex-direction:column}
+.hdr{display:flex;align-items:center;gap:8px;padding:max(12px,env(safe-area-inset-top)) 14px 8px;border-bottom:.5px solid var(--border);background:var(--bg);flex-shrink:0}
+.hdr-text{flex:1}.hdr h1{font-size:16px;font-weight:700}.hdr p{font-size:11px;color:var(--text2);margin-top:1px}
+.icon-btn{width:34px;height:34px;border-radius:50%;background:var(--bg2);border:.5px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;position:relative}
+.badge-dot{position:absolute;top:-2px;right:-2px;background:#E24B4A;color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:99px;min-width:16px;text-align:center;display:none}
+.user-pill{font-size:11px;font-weight:600;background:var(--blue-bg);color:var(--blue-t);border:.5px solid var(--blue-b);border-radius:99px;padding:4px 10px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.nav{display:flex;border-bottom:.5px solid var(--border);background:var(--bg);flex-shrink:0;overflow-x:auto}
+.nav::-webkit-scrollbar{display:none}
+.nav button{flex:1;min-width:44px;padding:9px 2px 8px;font-size:10px;font-weight:500;background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;white-space:nowrap;font-family:inherit}
+.nav button.active{color:var(--text);border-bottom-color:var(--text);font-weight:700}
+.screens{flex:1;overflow:hidden;position:relative}
+.sc{display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px max(14px,env(safe-area-inset-bottom))}
+.sc.active{display:block}
+.fl{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;margin-top:14px}
+.fl.nt{margin-top:0}
+input[type=text],input[type=password],input[type=date],input[type=email],input[type=tel],select,textarea{width:100%;padding:10px 12px;font-size:15px;border:.5px solid var(--border);border-radius:var(--rs);background:var(--bg);color:var(--text);font-family:inherit;-webkit-appearance:none}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,0,0,.06)}
+textarea{resize:vertical;min-height:70px;font-size:14px}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236e6e73' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.btn{width:100%;padding:11px;border-radius:var(--rs);font-size:15px;font-weight:500;cursor:pointer;border:.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;transition:opacity .15s}
+.btn:active{opacity:.7}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-p{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.btn-g{background:var(--green-bg);color:var(--green-t);border-color:var(--green-b)}
+.btn-d{background:var(--red-bg);color:var(--red-t);border-color:var(--red-b)}
+.btn-w{background:var(--amber-bg);color:var(--amber-t);border-color:var(--amber-b)}
+.btn-b{background:var(--blue-bg);color:var(--blue-t);border-color:var(--blue-b)}
+.btn-t{background:var(--teal-bg);color:var(--teal-t);border-color:var(--teal-b)}
+.btn-sm{width:auto;padding:7px 12px;font-size:13px}
+.row{display:flex;gap:8px}.row .btn{flex:1}
+.card{background:var(--bg2);border-radius:var(--r);border:.5px solid var(--border2);padding:12px 14px}
+.prow{display:flex;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:.5px solid var(--border2)}
+.prow:last-child{border-bottom:none}
+.pi{flex:1;min-width:0}
+.pid{font-size:14px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn{font-size:12px;color:var(--text2);margin-top:2px}
+.pa{font-size:11px;color:var(--text3);margin-top:3px;line-height:1.5}
+.ib{width:30px;height:30px;border-radius:var(--rs);border:.5px solid var(--border);background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;color:var(--text)}
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 6px;border-radius:99px;margin-left:4px;vertical-align:middle}
+.b-staged{background:var(--amber-bg);color:var(--amber-t)}
+.b-out{background:var(--blue-bg);color:var(--blue-t)}
+.b-inst{background:var(--green-bg);color:var(--green-t)}
+.b-over{background:var(--red-bg);color:var(--red-t)}
+.b-pending{background:var(--amber-bg);color:var(--amber-t)}
+.b-open{background:var(--red-bg);color:var(--red-t)}
+.ps{font-size:11px;padding:3px 7px;border-radius:99px;flex-shrink:0;font-weight:500;margin-top:2px}
+.s-staged{background:var(--amber-bg);color:var(--amber-t)}
+.s-out{background:var(--blue-bg);color:var(--blue-t)}
+.s-inst{background:var(--green-bg);color:var(--green-t)}
+.s-over{background:var(--red-bg);color:var(--red-t)}
+.bb{border-radius:var(--rs);padding:10px 12px;margin-top:8px}
+.bb-ok{background:var(--green-bg);border:.5px solid var(--green-b)}
+.bb-ok .bn{font-size:15px;font-weight:600;color:var(--green-t)}
+.bb-ok .bm{font-size:12px;color:var(--green-t);opacity:.8;margin-top:2px}
+.bb-warn{background:var(--amber-bg);border:.5px solid var(--amber-b)}
+.bb-warn .bm{font-size:13px;color:var(--amber-t)}
+.bb-err{background:var(--red-bg);border:.5px solid var(--red-b)}
+.bb-err .bm{font-size:13px;color:var(--red-t)}
+.bb-info{background:var(--blue-bg);border:.5px solid var(--blue-b)}
+.bb-info .bn{font-size:15px;font-weight:600;color:var(--blue-t)}
+.bb-info .bm{font-size:12px;color:var(--blue-t);opacity:.8;margin-top:2px}
+.over-flag{background:var(--red-bg);border:.5px solid var(--red-b);border-radius:var(--rs);padding:10px 12px;margin-top:8px}
+.over-flag .ot{font-size:13px;font-weight:600;color:var(--red-t)}
+.over-flag .om{font-size:12px;color:var(--red-t);margin-top:4px;line-height:1.5;opacity:.85}
+.divider{height:.5px;background:var(--border2);margin:14px 0}
+.sec{font-size:13px;font-weight:600;color:var(--text2);margin:14px 0 6px}
+.empty{text-align:center;padding:2rem 1rem;color:var(--text3);font-size:14px}
+.backbtn{font-size:14px;color:var(--text2);background:none;border:none;cursor:pointer;padding:0 0 10px;font-family:inherit}
+.toast{position:fixed;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:8px 18px;border-radius:99px;font-size:13px;font-weight:500;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap;z-index:9999}
+.toast.show{opacity:1}
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:flex-end;justify-content:center;padding-bottom:max(24px,env(safe-area-inset-bottom))}
+.modal-sh{background:var(--bg);border-radius:20px 20px 16px 16px;width:100%;max-width:440px;padding:20px 20px 12px;max-height:88vh;overflow-y:auto}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:14px}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-card{width:100%;max-width:360px}
+.login-logo{font-size:44px;text-align:center;margin-bottom:12px}
+.login-title{font-size:26px;font-weight:700;text-align:center;margin-bottom:4px}
+.login-sub{font-size:14px;color:var(--text2);text-align:center;margin-bottom:28px}
+.login-err{background:var(--red-bg);border:.5px solid var(--red-b);border-radius:var(--rs);padding:10px 12px;font-size:13px;color:var(--red-t);margin-bottom:12px;display:none}
+.role-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;margin-left:5px;display:inline-block}
+.role-admin{background:var(--purple-bg);color:var(--purple-t)}
+.role-stager{background:var(--amber-bg);color:var(--amber-t)}
+.role-signout{background:var(--green-bg);color:var(--green-t)}
+.role-requestor{background:var(--blue-bg);color:var(--blue-t)}
+.role-technician{background:var(--teal-bg);color:var(--teal-t)}
+.role-foreman{background:var(--purple-bg);color:var(--purple-t)}
+.cam-wrap{position:relative;border-radius:var(--r);overflow:hidden;background:#000;aspect-ratio:4/3;width:100%}
+.cam-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.scan-rect{width:60%;max-width:220px;aspect-ratio:3/1;border:2px solid rgba(255,255,255,.8);border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
+.scan-line{position:absolute;left:4px;right:4px;height:2px;background:rgba(255,59,48,.8);border-radius:2px;animation:scanA 2s ease-in-out infinite}
+@keyframes scanA{0%,100%{top:10%}50%{top:85%}}
+.cam-status{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;font-weight:500;color:rgba(255,255,255,.9);background:rgba(0,0,0,.4);padding:4px}
+.cam-det{position:absolute;top:8px;left:0;right:0;text-align:center}
+.cam-det span{background:rgba(52,199,89,.9);color:#fff;font-size:12px;font-weight:600;padding:4px 12px;border-radius:99px}
+.cart-box{background:var(--bg2);border-radius:var(--r);border:.5px solid var(--border2);padding:12px}
+.cart-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cart-title{font-size:14px;font-weight:600}
+.cart-badge{background:var(--text);color:var(--bg);font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px}
+.cart-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:.5px solid var(--border2)}
+.cart-item:last-child{border-bottom:none}
+.ci{flex:1;min-width:0}.cn{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cb{font-size:11px;color:var(--text2)}
+.qty-c{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.qty-c span{font-size:15px;font-weight:600;min-width:24px;text-align:center}
+.qty-c button{width:26px;height:26px;border-radius:6px;border:.5px solid var(--border);background:var(--bg);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+.mode-toggle{display:flex;border:.5px solid var(--border);border-radius:var(--rs);overflow:hidden}
+.mode-toggle button{flex:1;padding:9px 6px;font-size:13px;font-weight:500;background:var(--bg2);border:none;cursor:pointer;color:var(--text2);font-family:inherit}
+.mode-toggle button.active{background:var(--accent);color:var(--bg)}
+.mode-toggle button:disabled{opacity:.35;cursor:not-allowed}
+.tab-row{display:flex;border-bottom:.5px solid var(--border2);margin-bottom:12px;overflow-x:auto}
+.tab-row::-webkit-scrollbar{display:none}
+.tab-btn{flex:1;min-width:52px;padding:8px 4px;font-size:11px;font-weight:500;background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:inherit;white-space:nowrap}
+.tab-btn.active{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+.mf-item{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:.5px solid var(--border2)}
+.mf-item:last-child{border-bottom:none}
+.mf-check{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;margin-top:1px}
+.mfc-done{background:var(--green-bg);border-color:var(--green-b);color:var(--green-t)}
+.mfc-staged{background:var(--amber-bg);border-color:var(--amber-b);color:var(--amber-t)}
+.mfc-inst{background:var(--teal-bg);border-color:var(--teal-b);color:var(--teal-t)}
+.mfc-miss{background:var(--bg2);border-color:var(--border);color:var(--text3)}
+.mfc-over{background:var(--red-bg);border-color:var(--red-b);color:var(--red-t)}
+.mf-prog{background:var(--bg3);border-radius:99px;height:6px;overflow:hidden;margin:8px 0}
+.mf-prog-bar{height:100%;background:var(--green-t);border-radius:99px;transition:width .4s}
+.mf-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.mf-stat{background:var(--bg2);border-radius:var(--rs);padding:8px 6px;text-align:center}
+.mf-stat .msv{font-size:18px;font-weight:700}.mf-stat .msl{font-size:10px;color:var(--text2);margin-top:1px}
+.notif-item{display:flex;gap:10px;padding:11px 0;border-bottom:.5px solid var(--border2)}
+.notif-item:last-child{border-bottom:none}
+.notif-dot{width:8px;height:8px;border-radius:50%;background:var(--blue-t);flex-shrink:0;margin-top:5px}
+.notif-dot.read{background:var(--bg3)}
+.photo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.photo-thumb{position:relative;aspect-ratio:4/3;border-radius:var(--rs);overflow:hidden;background:var(--bg3)}
+.photo-thumb img{width:100%;height:100%;object-fit:cover}
+.photo-thumb .del-ph{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px}
+.photo-thumb .ph-cap{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:4px 6px}
+.plan-card{background:var(--bg2);border-radius:var(--r);border:.5px solid var(--border2);padding:12px 14px;margin-bottom:10px}
+.plan-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+canvas.markup-canvas{border-radius:var(--rs);width:100%;touch-action:none;border:.5px solid var(--border)}
+.markup-tools{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center}
+.color-dot{width:28px;height:28px;border-radius:50%;cursor:pointer;border:3px solid transparent;flex-shrink:0}
+.color-dot.active{border-color:var(--text)}
+.sched-item{display:flex;gap:10px;padding:10px 0;border-bottom:.5px solid var(--border2);cursor:pointer}
+.sched-item:last-child{border-bottom:none}
+.sched-date-box{background:var(--bg2);border-radius:var(--rs);padding:6px 10px;text-align:center;flex-shrink:0;min-width:50px}
+.sched-date-box .sd{font-size:18px;font-weight:700;line-height:1}
+.sched-date-box .sm{font-size:10px;color:var(--text2)}
+.sched-urgent .sched-date-box{background:var(--red-bg);border:.5px solid var(--red-b)}
+.sched-urgent .sched-date-box .sd{color:var(--red-t)}
+.sched-soon .sched-date-box{background:var(--amber-bg);border:.5px solid var(--amber-b)}
+.sched-soon .sched-date-box .sd{color:var(--amber-t)}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-day{min-height:44px;background:var(--bg2);border-radius:4px;padding:4px;cursor:pointer}
+.cal-day.today{background:var(--blue-bg);border:.5px solid var(--blue-b)}
+.cal-day .cal-num{font-size:12px;font-weight:600;margin-bottom:2px}
+.cal-day .cal-dot{width:5px;height:5px;border-radius:50%;background:var(--amber-t);margin:1px auto}
+.cal-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+.cal-hdr span{text-align:center;font-size:10px;font-weight:600;color:var(--text2);padding:4px 0}
+.phase-bar{display:flex;gap:4px;margin:10px 0}
+.phase-step{flex:1;height:6px;border-radius:99px;background:var(--bg3)}
+.phase-step.done{background:var(--green-t)}
+.phase-step.active{background:var(--amber-t)}
+.perm-lock{background:var(--red-bg);border:.5px solid var(--red-b);border-radius:var(--rs);padding:14px;text-align:center;margin:12px 0}
+.upload-progress{background:var(--bg3);border-radius:99px;height:4px;overflow:hidden;margin-top:8px}
+.upload-progress-bar{height:100%;background:var(--blue-t);border-radius:99px;transition:width .3s}
+.sum-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.sum-card{background:var(--bg2);border-radius:var(--r);padding:14px;border:.5px solid var(--border2)}
+.sum-card .sv{font-size:28px;font-weight:700}.sum-card .sl{font-size:12px;color:var(--text2);margin-top:2px}
+.sum-card.green .sv{color:var(--green-t)}.sum-card.amber .sv{color:var(--amber-t)}
+.sum-card.red .sv{color:var(--red-t)}.sum-card.blue .sv{color:var(--blue-t)}
+.job-card{background:var(--bg2);border-radius:var(--r);border:.5px solid var(--border2);padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.job-card:active{opacity:.8}
+.alert-banner{background:var(--red-bg);border:.5px solid var(--red-b);border-radius:var(--rs);padding:10px 12px;margin-bottom:8px}
+.alert-banner .at{font-size:13px;font-weight:600;color:var(--red-t)}
+.alert-banner .am{font-size:12px;color:var(--red-t);opacity:.85;margin-top:3px}
+.sm-icon{font-size:40px;text-align:center;margin-bottom:8px}
+.sm-title{font-size:18px;font-weight:700;text-align:center;margin-bottom:6px}
+.sm-part{font-size:15px;font-weight:600;color:var(--green-t);background:var(--green-bg);border:.5px solid var(--green-b);border-radius:var(--rs);padding:10px 14px;text-align:center;margin-bottom:6px}
+.sm-sub{font-size:13px;color:var(--text2);text-align:center;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">&#127959;</div>
+      <div class="login-title">Field Ops</div>
+      <div class="login-sub">Warehouse &amp; Project Management</div>
+      <div class="login-err" id="login-err"></div>
+      <div class="fl nt">Username</div>
+      <input type="text" id="l-user" placeholder="Username" autocomplete="username" style="margin-bottom:10px" onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()"/>
+      <div class="fl">Password</div>
+      <input type="password" id="l-pass" placeholder="Password" autocomplete="current-password" style="margin-bottom:14px" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <button class="btn btn-p" onclick="doLogin()" id="login-btn">Sign In</button>
+      <div style="font-size:12px;color:var(--text3);text-align:center;margin-top:14px" id="server-status"></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+<div class="hdr">
+  <div class="hdr-text"><h1>Field Ops</h1><p id="hdr-sub">Loading</p></div>
+  <div class="icon-btn" onclick="show('notif')">&#128276;<span class="badge-dot" id="notif-badge"></span></div>
+  <div class="icon-btn" onclick="show('schedule')" title="Schedule">&#128197;</div>
+  <div class="user-pill" id="user-pill" onclick="doLogout()">--</div>
+</div>
+<div class="nav">
+  <button class="active" onclick="show('dash')">Dashboard</button>
+  <button onclick="show('jobs')">Jobs</button>
+  <button onclick="show('scan')">Scan</button>
+  <button onclick="show('orders')">Orders</button>
+  <button onclick="show('catalog')">Catalog</button>
+  <button onclick="show('inv')">Stock</button>
+  <button onclick="show('schedule')">Schedule</button>
+  <button onclick="show('report')">Reports</button>
+  <button onclick="show('log')" id="nav-log" style="display:none">Log</button>
+  <button onclick="show('admin')" id="nav-admin" style="display:none">Admin</button>
+</div>
+<div class="screens">
+
+<!-- DASHBOARD -->
+<div id="sc-dash" class="sc active">
+  <div id="dash-alerts"></div>
+  <div class="sum-cards" id="dash-stats">
+    <div class="sum-card blue"><div class="sv" id="ds-jobs">--</div><div class="sl">Active jobs</div></div>
+    <div class="sum-card amber"><div class="sv" id="ds-staged">--</div><div class="sl">Parts staged</div></div>
+    <div class="sum-card green"><div class="sv" id="ds-out">--</div><div class="sl">Signed out</div></div>
+    <div class="sum-card"><div class="sv" id="ds-inst" style="color:var(--teal-t)">--</div><div class="sl">Installed</div></div>
+  </div>
+  <div class="sec">Recent jobs</div>
+  <div id="dash-jobs"></div>
+</div>
+
+<!-- JOBS -->
+<div id="sc-jobs" class="sc">
+  <div id="jl-view">
+    <div id="job-create-section">
+      <button class="btn btn-p" onclick="showEl('create-job-modal')" style="margin-bottom:10px">+ New Job</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input type="text" id="j-search" placeholder="Search jobs..." style="flex:1;margin-bottom:0" oninput="renderJobs()"/>
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);white-space:nowrap;cursor:pointer"><input type="checkbox" id="j-arch" onchange="renderJobs()"/> Archived</label>
+    </div>
+    <div id="j-list"></div>
+  </div>
+  <div id="jd-view" style="display:none"></div>
+</div>
+
+<!-- SCAN -->
+<div id="sc-scan" class="sc">
+  <div id="perm-req-lock" class="perm-lock" style="display:none"><div style="font-size:28px">&#128274;</div><div style="font-size:14px;font-weight:600;color:var(--red-t);margin-top:6px">Use Orders tab to request parts</div></div>
+  <div id="scan-main">
+    <div class="fl nt">Job ID</div>
+    <input type="text" id="s-job" placeholder="Enter job ID" style="margin-bottom:10px"/>
+    <div class="mode-toggle" style="margin-bottom:10px">
+      <button class="active" id="mode-stage" onclick="setMode('stage')">Stage in</button>
+      <button id="mode-out" onclick="setMode('out')">Sign out</button>
+    </div>
+    <div id="cam-wrap-main" style="display:none;margin-bottom:8px">
+      <div class="cam-wrap"><div id="cam-prev-main"></div><div class="cam-overlay"><div class="scan-rect"><div class="scan-line"></div></div></div><div class="cam-status" id="cam-status-main">Align barcode in frame</div><div class="cam-det" id="cam-det-main" style="display:none"><span id="cam-det-text-main"></span></div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn btn-sm" id="cam-btn-main" onclick="toggleCam('main')" style="flex:1">&#128247; Camera</button>
+      <button class="btn btn-sm" id="torch-btn" onclick="toggleTorch()" style="flex:1;display:none">&#128294; Torch</button>
+    </div>
+    <div class="fl">Or type / hardware scanner</div>
+    <input type="text" id="s-part" placeholder="Barcode -- Enter to add" style="margin-bottom:6px" oninput="resolveBC(this.value,'s-resolve')" onkeydown="if(event.key==='Enter'){addToCart();this.value='';hideEl('s-resolve')}"/>
+    <div id="s-resolve" style="display:none;margin-bottom:8px"></div>
+    <div id="cart-box" style="display:none;margin-top:10px">
+      <div class="cart-box">
+        <div class="cart-hdr"><div class="cart-title" id="cart-lbl">Staging cart</div><span class="cart-badge" id="cart-cnt">0</span></div>
+        <div id="cart-items"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn btn-p" id="cart-commit-btn" onclick="commitCart()" style="flex:2">Stage all to job</button>
+        <button class="btn btn-d btn-sm" onclick="clearCart()">Clear</button>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="sec">Recent</div>
+    <div id="s-recent"><div class="empty">No activity yet</div></div>
+  </div>
+</div>
+
+<!-- ORDERS -->
+<div id="sc-orders" class="sc">
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:15px;font-weight:600;margin-bottom:10px">Request parts for a job</div>
+    <div class="fl nt">Job ID</div>
+    <input type="text" id="ord-job" placeholder="Job ID" style="margin-bottom:8px"/>
+    <div class="fl">Notes</div>
+    <input type="text" id="ord-notes" placeholder="e.g. urgent, needed by Friday" style="margin-bottom:10px"/>
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px">Parts to request</div>
+    <div id="ord-parts-list"></div>
+    <div style="display:flex;gap:8px;margin:8px 0">
+      <input type="text" id="ord-bc" placeholder="Barcode" style="flex:1;margin-bottom:0" oninput="resolveBC(this.value,'ord-res')"/>
+      <input type="text" id="ord-qty" placeholder="Qty" style="width:56px;margin-bottom:0"/>
+      <button class="btn btn-sm btn-p" onclick="addOrdPart()">Add</button>
+    </div>
+    <div id="ord-res" style="display:none;margin-bottom:8px"></div>
+    <button class="btn btn-p" onclick="submitOrder()">Submit Request</button>
+  </div>
+  <div class="sec" style="margin-top:0">All Orders</div>
+  <div id="orders-list"></div>
+</div>
+
+<!-- CATALOG -->
+<div id="sc-catalog" class="sc">
+  <div id="cat-edit-section">
+    <div class="fl nt">Primary barcode</div>
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <input type="text" id="c-bc" placeholder="Scan or type" style="flex:1;margin-bottom:0" oninput="resolveCatBC(this.value)"/>
+      <button class="btn btn-sm" id="cat-cam-btn" onclick="toggleCam('cat')" style="flex-shrink:0">&#128247;</button>
+    </div>
+    <div id="cat-cam-wrap" style="display:none;margin-bottom:8px">
+      <div class="cam-wrap"><div id="cam-prev-cat"></div><div class="cam-overlay"><div class="scan-rect"><div class="scan-line"></div></div></div><div class="cam-status" id="cam-status-cat">Align barcode</div><div class="cam-det" id="cam-det-cat" style="display:none"><span id="cam-det-text-cat"></span></div></div>
+    </div>
+    <div id="cat-bc-res" style="display:none;margin-bottom:6px"></div>
+    <div class="fl">Alt barcodes (comma separated)</div>
+    <input type="text" id="c-alt" placeholder="12345,67890 -- same part different scans" style="margin-bottom:8px"/>
+    <div class="fl">Part number</div><input type="text" id="c-pn" placeholder="e.g. ELB-075-CU" style="margin-bottom:8px"/>
+    <div class="fl">Part name *</div><input type="text" id="c-nm" placeholder="e.g. 3/4 in copper elbow" style="margin-bottom:8px"/>
+    <div class="fl">Category</div><input type="text" id="c-cat" placeholder="e.g. fittings" style="margin-bottom:8px"/>
+    <div class="fl">Description</div><textarea id="c-desc" placeholder="Notes, specs..." style="margin-bottom:10px"></textarea>
+    <button class="btn btn-p" onclick="saveCat()">Save to Catalog</button>
+    <div class="divider"></div>
+    <div class="row">
+      <button class="btn btn-sm" onclick="exportCatCSV()" style="flex:1">Export CSV</button>
+      <label class="btn btn-sm" style="flex:1;text-align:center;cursor:pointer">Import CSV<input type="file" accept=".csv" style="display:none" onchange="importCatCSV(this)"></label>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin:6px 0 10px">Columns: barcode, alt_barcodes, part_number, name, category, description</div>
+  </div>
+  <div class="fl">Search catalog</div>
+  <input type="text" id="c-search" placeholder="Name, barcode, part number..." style="margin-bottom:10px" oninput="renderCat()"/>
+  <div id="c-list"></div>
+</div>
+
+<!-- STOCK -->
+<div id="sc-inv" class="sc">
+  <div id="inv-cam-wrap" style="display:none;margin-bottom:8px">
+    <div class="cam-wrap"><div id="cam-prev-inv"></div><div class="cam-overlay"><div class="scan-rect"><div class="scan-line"></div></div></div><div class="cam-status" id="cam-status-inv">Align barcode</div><div class="cam-det" id="cam-det-inv" style="display:none"><span id="cam-det-text-inv"></span></div></div>
+  </div>
+  <div class="fl nt">Barcode / Part ID</div>
+  <div style="display:flex;gap:8px;margin-bottom:6px">
+    <input type="text" id="i-bc" placeholder="Scan or type" style="flex:1;margin-bottom:0" oninput="resolveInvBC(this.value)"/>
+    <button class="btn btn-sm" id="inv-cam-btn" onclick="toggleCam('inv')" style="flex-shrink:0">&#128247;</button>
+  </div>
+  <div id="inv-bc-res" style="display:none;margin-bottom:6px"></div>
+  <div class="fl">Part name</div><input type="text" id="i-nm" placeholder="Part name" style="margin-bottom:8px"/>
+  <div class="fl">Description / location</div>
+  <textarea id="i-desc" placeholder="Shelf location, supplier, specs..." style="margin-bottom:8px"></textarea>
+  <div class="fl">Min stock alert (0 = off)</div>
+  <input type="text" id="i-min" placeholder="e.g. 10" style="margin-bottom:8px"/>
+  <div class="fl">Qty to add</div>
+  <input type="text" id="i-qty" placeholder="Default 1" style="margin-bottom:10px"/>
+  <button class="btn btn-p" onclick="addInv()">Add to Stock</button>
+  <div class="divider"></div>
+  <div class="fl">Search stock</div>
+  <input type="text" id="inv-search" placeholder="Name, barcode..." style="margin-bottom:10px" oninput="renderInv()"/>
+  <div class="sec" style="margin-top:0">Current Stock</div>
+  <div id="i-list"></div>
+</div>
+
+<!-- SCHEDULE -->
+<div id="sc-schedule" class="sc">
+  <div class="row" style="margin-bottom:14px">
+    <button class="btn btn-sm btn-p" id="sched-list-btn" onclick="schedView('list')" style="flex:1">List</button>
+    <button class="btn btn-sm" id="sched-cal-btn" onclick="schedView('cal')" style="flex:1">Calendar</button>
+  </div>
+  <div id="sched-list-view"></div>
+  <div id="sched-cal-view" style="display:none"></div>
+</div>
+
+<!-- REPORTS -->
+<div id="sc-report" class="sc">
+  <div class="fl nt">Filter by job</div>
+  <input type="text" id="rpt-job" placeholder="Leave blank for all" style="margin-bottom:10px" oninput="renderReport()"/>
+  <div class="row" style="margin-bottom:8px">
+    <button class="btn btn-sm btn-g" onclick="exportRptCSV('staged')" style="flex:1">Staged CSV</button>
+    <button class="btn btn-sm btn-b" onclick="exportRptCSV('signedout')" style="flex:1">Signed Out CSV</button>
+  </div>
+  <button class="btn btn-sm btn-w" onclick="exportRptCSV('full')" style="width:100%;margin-bottom:14px">Full Report (Smartsheet)</button>
+  <div id="report-body"></div>
+</div>
+
+<!-- NOTIFICATIONS -->
+<div id="sc-notif" class="sc">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:18px;font-weight:700">Notifications</div>
+    <div class="row" style="gap:6px">
+      <button class="btn btn-sm" onclick="markAllRead()">Mark read</button>
+      <button class="btn btn-sm btn-d" onclick="clearNotifs()">Clear</button>
+    </div>
+  </div>
+  <div id="notif-list"><div class="empty">No notifications</div></div>
+</div>
+
+<!-- LOG -->
+<div id="sc-log" class="sc">
+  <input type="text" id="log-filter" placeholder="Filter by job, person, part..." style="margin-bottom:8px" oninput="renderLog()"/>
+  <button class="btn btn-sm" onclick="exportLogCSV()" style="margin-bottom:10px">Export CSV</button>
+  <div id="log-list"><div class="empty">No activity</div></div>
+</div>
+
+<!-- ADMIN -->
+<div id="sc-admin" class="sc">
+  <div id="admin-lock" class="perm-lock" style="display:none"><div style="font-size:28px">&#128274;</div><div style="font-size:14px;font-weight:600;color:var(--red-t);margin-top:6px">Admin only</div></div>
+  <div id="admin-wrap">
+    <div style="font-size:18px;font-weight:700;margin-bottom:14px">User Management</div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:10px">Add New User</div>
+      <div class="fl nt">Full name</div><input type="text" id="a-name" style="margin-bottom:8px"/>
+      <div class="fl">Username</div><input type="text" id="a-user" style="margin-bottom:8px" autocomplete="off"/>
+      <div class="fl">Password</div><input type="password" id="a-pass" placeholder="Min 6 chars" style="margin-bottom:8px" autocomplete="new-password"/>
+      <div class="fl">Role</div>
+      <select id="a-role" style="margin-bottom:10px">
+        <option value="stager">Stager -- stage and sign out parts</option>
+        <option value="signout">Sign-out only</option>
+        <option value="requestor">Requestor -- submit part requests</option>
+        <option value="technician">Technician -- field work, install parts, daily logs</option>
+        <option value="foreman">Foreman -- technician + approve requests</option>
+        <option value="admin">Admin -- full access</option>
+      </select>
+      <button class="btn btn-p" onclick="createUser()">Add User</button>
+    </div>
+    <div class="sec" style="margin-top:0">All Users</div>
+    <div id="users-list"></div>
+  </div>
+</div>
+
+</div><!-- screens -->
+</div><!-- app -->
+
+<!-- SCAN CONFIRM MODAL -->
+<div class="modal-ov" id="scan-modal" style="display:none">
+  <div class="modal-sh">
+    <div class="sm-icon">&#9989;</div>
+    <div class="sm-title">Scanned!</div>
+    <div class="sm-part" id="sm-part-name">--</div>
+    <div class="sm-sub" id="sm-sub"></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-p" onclick="scanAnother()" style="font-size:16px">&#128247; Scan Another</button>
+      <button class="btn btn-g" onclick="scanDone()" style="font-size:16px">&#10003; Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE JOB MODAL -->
+<div class="modal-ov" id="create-job-modal" style="display:none">
+  <div class="modal-sh">
+    <div class="modal-title">Create New Job</div>
+    <div class="fl nt">Job ID *</div><input type="text" id="cj-id" placeholder="e.g. JOB-2026-001" style="margin-bottom:8px"/>
+    <div class="fl">Job name</div><input type="text" id="cj-name" placeholder="e.g. Main St Office Buildout" style="margin-bottom:8px"/>
+    <div class="fl">Site address</div><input type="text" id="cj-addr" placeholder="123 Main St, City, State" style="margin-bottom:8px"/>
+    <div class="fl">GC Company</div><input type="text" id="cj-gcc" style="margin-bottom:8px"/>
+    <div class="fl">GC Contact name</div><input type="text" id="cj-gcn" style="margin-bottom:8px"/>
+    <div class="fl">GC Phone</div><input type="tel" id="cj-gcp" style="margin-bottom:8px"/>
+    <div class="fl">GC Email</div><input type="email" id="cj-gce" style="margin-bottom:8px"/>
+    <div class="fl">Superintendent name</div><input type="text" id="cj-supn" style="margin-bottom:8px"/>
+    <div class="fl">Superintendent phone</div><input type="tel" id="cj-supp" style="margin-bottom:14px"/>
+    <div class="row">
+      <button class="btn btn-p" onclick="createJob()" style="flex:2">Create Job</button>
+      <button class="btn" onclick="hideEl('create-job-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT USER MODAL -->
+<div class="modal-ov" id="eu-modal" style="display:none">
+  <div class="modal-sh">
+    <div class="modal-title">Edit User</div>
+    <input type="hidden" id="eu-id"/>
+    <div class="fl nt">Full name</div><input type="text" id="eu-name" style="margin-bottom:8px"/>
+    <div class="fl">Role</div>
+    <select id="eu-role" style="margin-bottom:8px">
+      <option value="stager">Stager</option>
+      <option value="signout">Sign-out only</option>
+      <option value="requestor">Requestor</option>
+      <option value="technician">Technician</option>
+      <option value="foreman">Foreman</option>
+      <option value="admin">Admin</option>
+    </select>
+    <div class="fl">New password (blank = keep)</div><input type="password" id="eu-pass" style="margin-bottom:8px" autocomplete="new-password"/>
+    <div class="fl">Status</div>
+    <select id="eu-active" style="margin-bottom:14px"><option value="1">Active</option><option value="0">Disabled</option></select>
+    <div class="row">
+      <button class="btn btn-p" onclick="saveEditUser()" style="flex:2">Save</button>
+      <button class="btn" onclick="hideEl('eu-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- MARKUP MODAL -->
+<div class="modal-ov" id="markup-modal" style="display:none">
+  <div class="modal-sh" style="max-height:92vh">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:16px;font-weight:700" id="markup-title">Plan Markup</div>
+      <button class="btn btn-sm btn-d" onclick="hideEl('markup-modal')">Close</button>
+    </div>
+    <div class="markup-tools">
+      <div class="color-dot active" style="background:#E24B4A" onclick="setDrawColor('#E24B4A',this)" title="Red"></div>
+      <div class="color-dot" style="background:#1d1d1f" onclick="setDrawColor('#1d1d1f',this)" title="Black"></div>
+      <div class="color-dot" style="background:#185fa5" onclick="setDrawColor('#185fa5',this)" title="Blue"></div>
+      <div class="color-dot" style="background:#27500a" onclick="setDrawColor('#27500a',this)" title="Green"></div>
+      <div class="color-dot" style="background:#f5f5f7;border:1px solid var(--border)" onclick="setDrawColor('#f5f5f7',this)" title="White/Erase"></div>
+      <input type="range" id="brush-size" min="2" max="20" value="4" style="width:70px"/>
+      <button class="btn btn-sm btn-d" onclick="clearMarkup()">Clear</button>
+      <button class="btn btn-sm btn-p" onclick="saveMarkup()">Save</button>
+    </div>
+    <canvas id="markup-canvas" class="markup-canvas"></canvas>
+    <div class="fl" style="margin-top:12px">Notes for this plan</div>
+    <textarea id="markup-notes" placeholder="Add notes..." style="margin-bottom:10px"></textarea>
+    <button class="btn btn-g" onclick="saveMarkupAndNotes()">Save markup &amp; notes</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+const API=window.location.origin+'/api';
+const CL_CLOUD='disyczlam';
+const CL_PRESET='btgbch6a';
+let token=localStorage.getItem('wh_token');
+let CU=null,catalog={},jobs={},invData={},notifData=[],logData=[],ordParts=[],ordersData=[],schedData=[];
+let recent=JSON.parse(localStorage.getItem('wh_recent')||'[]');
+let cart={mode:'stage',items:{}};
+let camActive={},torchOn=false,torchTrack=null,scanCD=false;
+let markupCanvas=null,markupCtx=null,markupDrawing=false,drawColor='#E24B4A',drawSize=4;
+let currentMarkupPlan=null,currentMarkupJobId=null,markupImg=null;
+let jsCart2={};
+
+async function api(method,path,body){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(token)opts.headers['Authorization']='Bearer '+token;
+  if(body)opts.body=JSON.stringify(body);
+  try{
+    const r=await fetch(API+path,opts);
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||'Server error '+r.status);
+    return d;
+  }catch(e){if(e.message.includes('Failed to fetch'))throw new Error('Cannot reach server');throw e;}
+}
+function toast(m,d=2500){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),d);}
+function showEl(id){const e=document.getElementById(id);if(e)e.style.display='';}
+function hideEl(id){const e=document.getElementById(id);if(e)e.style.display='none';}
+function fmtCSV(rows){return rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');}
+function dlCSV(csv,fn){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=fn;a.click();}
+function fmtDate(d){if(!d)return '--';try{const dt=new Date(d);return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return d;}}
+function daysUntil(d){if(!d)return null;const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(d)-t)/(864e5));}
+
+async function init(){
+  hideEl('app');showEl('login-screen');
+  if(token){try{CU=await api('GET','/me');showApp();return;}catch(e){token=null;localStorage.removeItem('wh_token');document.getElementById('server-status').textContent='Session expired';}}
+}
+async function doLogin(){
+  const u=document.getElementById('l-user').value.trim(),p=document.getElementById('l-pass').value;
+  const btn=document.getElementById('login-btn'),err=document.getElementById('login-err');
+  if(!u||!p){err.textContent='Enter username and password';err.style.display='block';return;}
+  btn.disabled=true;btn.textContent='Signing in...';err.style.display='none';
+  try{const d=await api('POST','/login',{username:u,password:p});token=d.token;CU=d.user;localStorage.setItem('wh_token',token);showApp();}
+  catch(e){err.textContent=e.message;err.style.display='block';btn.disabled=false;btn.textContent='Sign In';}
+}
+function doLogout(){if(confirm('Sign out?')){token=null;CU=null;localStorage.removeItem('wh_token');location.reload();}}
+function roleLabel(r){return{admin:'Administrator',stager:'Stager',signout:'Sign-out',requestor:'Requestor',technician:'Technician',foreman:'Foreman'}[r]||r;}
+
+function showApp(){
+  hideEl('login-screen');
+  const app=document.getElementById('app');app.style.display='flex';
+  document.getElementById('user-pill').textContent=CU.name;
+  document.getElementById('hdr-sub').textContent=roleLabel(CU.role);
+  if(CU.role==='admin'){showEl('nav-log');showEl('nav-admin');}
+  const canEdit=['admin','stager','foreman'].includes(CU.role);
+  if(!canEdit){hideEl('job-create-section');hideEl('cat-edit-section');}
+  if(CU.role==='requestor'||CU.role==='signout'){hideEl('scan-main');}
+  if(CU.role==='requestor'){showEl('perm-req-lock');}
+  if(CU.role==='signout'){document.getElementById('mode-stage').disabled=true;}
+  loadAll();show('dash');
+}
+async function loadAll(){
+  await Promise.all([loadCatalog(),loadJobs(),loadNotifs(),loadInv()]);
+  await loadSchedule();
+  renderDash();renderRecent();
+}
+
+function show(n){
+  stopAllCams();
+  document.querySelectorAll('.sc').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b=>{b.classList.toggle('active',(b.getAttribute('onclick')||'').includes("'"+n+"'"));});
+  const sc=document.getElementById('sc-'+n);if(sc)sc.classList.add('active');
+  if(n==='jobs')renderJobs();
+  if(n==='catalog')renderCat();
+  if(n==='report')renderReport();
+  if(n==='log')loadLog();
+  if(n==='admin')loadUsers();
+  if(n==='inv')renderInv();
+  if(n==='notif'){loadNotifs();renderNotifs();}
+  if(n==='orders'){loadOrders();renderOrders();}
+  if(n==='schedule')loadSchedule();
+  if(n==='dash')renderDash();
+}
+
+// CATALOG
+async function loadCatalog(){
+  try{const d=await api('GET','/catalog');catalog={};d.forEach(c=>{catalog[c.barcode]=c;(c.alt_barcodes||[]).forEach(ab=>{if(ab&&ab.trim())catalog[ab.trim()]=c;});});}catch(e){}
+}
+function lookup(bc){return bc?catalog[bc.trim()]||null:null;}
+function resolveCatBC(val){
+  const el=document.getElementById('cat-bc-res');if(!el)return;
+  const v=(val||'').trim();if(!v){el.style.display='none';return;}
+  const p=lookup(v);el.style.display='block';
+  if(p)el.innerHTML='<div class="bb bb-ok"><div class="bn">'+p.name+'</div><div class="bm">Already in catalog -- saving updates it</div></div>';
+  else el.innerHTML='<div class="bb bb-warn"><div class="bm">New barcode -- fill in details</div></div>';
+}
+async function saveCat(){
+  const bc=document.getElementById('c-bc').value.trim(),nm=document.getElementById('c-nm').value.trim();
+  if(!bc||!nm){toast('Barcode and name required');return;}
+  const alts=document.getElementById('c-alt').value.trim().split(',').map(a=>a.trim()).filter(Boolean);
+  try{
+    await api('POST','/catalog',{barcode:bc,name:nm,part_number:document.getElementById('c-pn').value.trim(),category:document.getElementById('c-cat').value.trim(),description:document.getElementById('c-desc').value.trim(),alt_barcodes:alts});
+    ['c-bc','c-alt','c-pn','c-nm','c-cat','c-desc'].forEach(id=>document.getElementById(id).value='');
+    hideEl('cat-bc-res');await loadCatalog();renderCat();toast('Saved: '+nm);
+  }catch(e){toast('Error: '+e.message);}
+}
+function renderCat(){
+  const q=(document.getElementById('c-search')?.value||'').toLowerCase();
+  const unique=Object.values(catalog).filter((c,i,a)=>a.findIndex(x=>x.barcode===c.barcode)===i);
+  const items=unique.filter(c=>(c.name+c.barcode+(c.part_number||'')+(c.category||'')).toLowerCase().includes(q));
+  const el=document.getElementById('c-list');if(!el)return;
+  if(!items.length){el.innerHTML='<div class="empty">No parts in catalog</div>';return;}
+  el.innerHTML=items.map(c=>`<div class="prow"><div class="pi"><div class="pid">${c.name}</div><div class="pn">${[c.part_number,c.barcode,c.category].filter(Boolean).join(' \u00b7 ')}</div>${c.alt_barcodes?.length?'<div class="pa">Alt: '+c.alt_barcodes.join(', ')+'</div>':''}${c.description?'<div class="pa">'+c.description+'</div>':''}</div>${CU?.role==='admin'?'<button class="ib" style="color:var(--red-t)" onclick="delCat(\''+c.barcode+'\')">&#215;</button>':''}</div>`).join('');
+}
+async function delCat(bc){if(!confirm('Remove?'))return;try{await api('DELETE','/catalog/'+encodeURIComponent(bc));await loadCatalog();renderCat();toast('Removed');}catch(e){toast(e.message);}}
+function exportCatCSV(){const u=Object.values(catalog).filter((c,i,a)=>a.findIndex(x=>x.barcode===c.barcode)===i);const rows=[['barcode','alt_barcodes','part_number','name','category','description']];u.forEach(c=>rows.push([c.barcode,(c.alt_barcodes||[]).join(','),c.part_number||'',c.name,c.category||'',c.description||'']));dlCSV(fmtCSV(rows),'catalog.csv');toast('Exported');}
+function importCatCSV(input){
+  const file=input.files[0];if(!file)return;
+  const r=new FileReader();r.onload=async e=>{
+    const lines=e.target.result.split('\n').filter(l=>l.trim());let hdr=null,count=0;
+    for(const line of lines){
+      const cols=line.match(/("(?:[^"]|"")*"|[^,]*)/g).map(v=>v.replace(/^"|"$/g,'').replace(/""/g,'"'));
+      if(!hdr){hdr=cols.map(h=>h.trim().toLowerCase());continue;}
+      const idx=f=>hdr.indexOf(f);
+      const bc=cols[idx('barcode')]?.trim(),nm=cols[idx('name')]?.trim();if(!bc||!nm)continue;
+      const alts=cols[idx('alt_barcodes')]?.trim().split(',').map(a=>a.trim()).filter(Boolean)||[];
+      try{await api('POST','/catalog',{barcode:bc,name:nm,part_number:cols[idx('part_number')]?.trim()||'',category:cols[idx('category')]?.trim()||'',description:cols[idx('description')]?.trim()||'',alt_barcodes:alts});count++;}catch(ex){}
+    }
+    await loadCatalog();renderCat();toast('Imported '+count);input.value='';
+  };r.readAsText(file);
+}
+
+// BARCODE RESOLVE
+function resolveBC(val,elId){
+  const el=document.getElementById(elId);if(!el)return;
+  const v=(val||'').trim();if(!v){el.style.display='none';return;}
+  const p=lookup(v);el.style.display='block';
+  if(p)el.innerHTML='<div class="bb bb-ok"><div class="bn">'+p.name+(p.part_number?' \u00b7 '+p.part_number:'')+'</div><div class="bm">'+(p.category||p.description||v)+'</div></div>';
+  else el.innerHTML='<div class="bb bb-warn"><div class="bm">Unknown barcode</div></div>';
+}
+function resolveInvBC(val){
+  const el=document.getElementById('inv-bc-res');if(!el)return;
+  const v=(val||'').trim();if(!v){el.style.display='none';return;}
+  const p=lookup(v);el.style.display='block';
+  if(p){el.innerHTML='<div class="bb bb-ok"><div class="bn">'+p.name+'</div><div class="bm">Found in catalog</div></div>';document.getElementById('i-nm').value=p.name;document.getElementById('i-desc').value=p.description||'';}
+  else{el.innerHTML='<div class="bb bb-warn"><div class="bm">Unknown barcode</div></div>';document.getElementById('i-nm').value='';}
+}
+
+// BEEP
+function playBeep(){try{const ctx=new(window.AudioContext||window.webkitAudioContext)();[[880,0],[1100,.1]].forEach(([f,d])=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type='sine';o.frequency.value=f;const t=ctx.currentTime+d;g.gain.setValueAtTime(.4,t);g.gain.exponentialRampToValueAtTime(.001,t+.15);o.start(t);o.stop(t+.15);});setTimeout(()=>ctx.close(),600);}catch(e){}}
+
+// CAMERAS
+function stopAllCams(){Object.keys(camActive).forEach(k=>{if(camActive[k])stopCam(k);});}
+function toggleCam(key){camActive[key]?stopCam(key):startCam(key);}
+function camEls(key){
+  const m={
+    main:{wrap:'cam-wrap-main',prev:'cam-prev-main',btn:'cam-btn-main',status:'cam-status-main',det:'cam-det-main',detTxt:'cam-det-text-main'},
+    cat:{wrap:'cat-cam-wrap',prev:'cam-prev-cat',btn:'cat-cam-btn',status:'cam-status-cat',det:'cam-det-cat',detTxt:'cam-det-text-cat'},
+    inv:{wrap:'inv-cam-wrap',prev:'cam-prev-inv',btn:'inv-cam-btn',status:'cam-status-inv',det:'cam-det-inv',detTxt:'cam-det-text-inv'}
+  };
+  return m[key]||m.main;
+}
+function startCam(key){
+  const e=camEls(key);
+  let wrap=document.getElementById(e.wrap);
+  if(!wrap){wrap=document.createElement('div');wrap.id=e.wrap;wrap.style.marginBottom='8px';wrap.innerHTML='<div class="cam-wrap"><div id="'+e.prev+'"></div><div class="cam-overlay"><div class="scan-rect"><div class="scan-line"></div></div></div><div class="cam-status" id="'+e.status+'">Align barcode</div><div class="cam-det" id="'+e.det+'" style="display:none"><span id="'+e.detTxt+'"></span></div></div>';const btn=document.getElementById(e.btn);if(btn)btn.parentElement.insertAdjacentElement('afterend',wrap);}
+  else wrap.style.display='block';
+  const btn=document.getElementById(e.btn);if(btn)btn.textContent='&#9209; Stop';
+  Quagga.init({inputStream:{type:'LiveStream',target:document.getElementById(e.prev),constraints:{facingMode:'environment'}},decoder:{readers:['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader','upc_e_reader','codabar_reader','i2of5_reader']},locate:true,numOfWorkers:2,frequency:10},err=>{
+    if(err){toast('Camera not available');stopCam(key);return;}
+    Quagga.start();camActive[key]=true;
+    const st=document.getElementById(e.status);if(st)st.textContent='Align barcode in frame';
+    if(key==='main'){const tr=Quagga.CameraAccess.getActiveTrack();if(tr?.getCapabilities?.().torch){torchTrack=tr;showEl('torch-btn');}}
+  });
+  Quagga.offDetected();
+  Quagga.onDetected(result=>{
+    const code=result.codeResult.code;if(!code||scanCD)return;
+    scanCD=true;try{Quagga.stop();}catch(ex){}camActive[key]=false;
+    playBeep();if(navigator.vibrate)navigator.vibrate([60,40,60]);
+    const det=document.getElementById(e.det),detTxt=document.getElementById(e.detTxt);
+    if(det&&detTxt){detTxt.textContent='\u2713 '+code;det.style.display='block';setTimeout(()=>det.style.display='none',800);}
+    const btn2=document.getElementById(e.btn);if(btn2)btn2.textContent=key==='main'?'&#128247; Camera':'&#128247;';
+    const w=document.getElementById(e.wrap);if(w)w.style.display='none';
+    if(key==='main'){torchTrack=null;torchOn=false;hideEl('torch-btn');}
+    scanCD=false;handleScan(key,code);
+  });
+}
+function stopCam(key){
+  if(!camActive[key])return;try{Quagga.stop();}catch(e){}camActive[key]=false;
+  const e=camEls(key);const w=document.getElementById(e.wrap);if(w)w.style.display='none';
+  const btn=document.getElementById(e.btn);if(btn)btn.textContent=key==='main'?'&#128247; Camera':'&#128247;';
+  if(key==='main'){torchTrack=null;torchOn=false;hideEl('torch-btn');}
+}
+function toggleTorch(){if(!torchTrack)return;torchOn=!torchOn;torchTrack.applyConstraints({advanced:[{torch:torchOn}]});document.getElementById('torch-btn').textContent=torchOn?'&#128294; ON':'&#128294; Torch';}
+function handleScan(key,code){
+  const part=lookup(code);const canon=part?part.barcode:code;
+  if(key==='main'){document.getElementById('s-part').value=canon;resolveBC(canon,'s-resolve');addToCartCode(canon);document.getElementById('s-part').value='';hideEl('s-resolve');showScanModal(canon);}
+  else if(key==='cat'){document.getElementById('c-bc').value=canon;resolveCatBC(canon);if(part){document.getElementById('c-pn').value=part.part_number||'';document.getElementById('c-nm').value=part.name||'';document.getElementById('c-cat').value=part.category||'';document.getElementById('c-desc').value=part.description||'';if(part.alt_barcodes?.length)document.getElementById('c-alt').value=part.alt_barcodes.join(', ');toast('Found -- edit and save to update');}else{setTimeout(()=>document.getElementById('c-nm').focus(),100);toast('New barcode');}}
+  else if(key==='inv'){document.getElementById('i-bc').value=canon;resolveInvBC(canon);if(part){setTimeout(()=>document.getElementById('i-qty').focus(),100);toast('Found: '+part.name);}else{setTimeout(()=>document.getElementById('i-nm').focus(),100);toast('New part');}}
+}
+
+// SCAN MODAL
+function showScanModal(code){
+  const item=cart.items[code];const p=lookup(code);
+  const nm=item?.name||p?.name||code;
+  const total=Object.values(cart.items).reduce((a,i)=>a+i.qty,0);
+  document.getElementById('sm-part-name').textContent=nm+(item?.qty>1?' \xd7 '+item.qty:'');
+  document.getElementById('sm-sub').innerHTML='In cart \u00b7 <strong>'+total+'</strong> item'+(total!==1?'s':'')+' total';
+  showEl('scan-modal');
+}
+function scanAnother(){hideEl('scan-modal');startCam('main');}
+function scanDone(){hideEl('scan-modal');document.getElementById('cart-box')?.scrollIntoView({behavior:'smooth',block:'center'});}
+
+// CART
+function setMode(m){
+  if(CU?.role==='signout'&&m==='stage'){toast('Not permitted');return;}
+  cart.mode=m;cart.items={};
+  document.getElementById('mode-stage').classList.toggle('active',m==='stage');
+  document.getElementById('mode-out').classList.toggle('active',m==='out');
+  document.getElementById('cart-lbl').textContent=m==='stage'?'Staging cart':'Sign-out cart';
+  document.getElementById('cart-commit-btn').textContent=m==='stage'?'Stage all to job':'Sign out all from job';
+  renderCart();
+}
+function addToCart(){const c=document.getElementById('s-part').value.trim();if(c)addToCartCode(c);}
+function addToCartCode(code){
+  const p=lookup(code);const canon=p?p.barcode:code;const nm=p?p.name:code;
+  if(cart.items[canon])cart.items[canon].qty++;else cart.items[canon]={id:canon,name:nm,qty:1};
+  renderCart();
+}
+function cartAdj(id,d){if(!cart.items[id])return;cart.items[id].qty=Math.max(1,cart.items[id].qty+d);renderCart();}
+function cartRm(id){delete cart.items[id];renderCart();}
+function clearCart(){cart.items={};renderCart();}
+function renderCart(){
+  const items=Object.values(cart.items);const box=document.getElementById('cart-box');
+  document.getElementById('cart-cnt').textContent=items.reduce((a,i)=>a+i.qty,0);
+  if(!items.length){box.style.display='none';return;}
+  box.style.display='block';
+  document.getElementById('cart-items').innerHTML=items.map(i=>`<div class="cart-item"><div class="ci"><div class="cn">${i.name!==i.id?i.name:i.id}</div><div class="cb">${i.id}</div></div><div class="qty-c"><button onclick="cartAdj('${i.id}',-1)">-</button><span>${i.qty}</span><button onclick="cartAdj('${i.id}',1)">+</button></div><button class="ib" style="color:var(--red-t)" onclick="cartRm('${i.id}')">&#215;</button></div>`).join('');
+}
+async function commitCart(){
+  const jobId=document.getElementById('s-job').value.trim();
+  if(!jobId){toast('Enter a job ID');return;}
+  const items=Object.values(cart.items);if(!items.length){toast('Cart is empty');return;}
+  if(!jobs[jobId]){try{const j=await api('GET','/jobs/'+jobId);jobs[j.id]=j;}catch(e){toast('Job not found -- create it in Jobs first');return;}}
+  let ok=0,errs=[];
+  for(const item of items){
+    try{
+      if(cart.mode==='stage'){await api('POST','/jobs/'+jobId+'/parts',{partId:item.id,part_name:item.name,assignedQty:item.qty});}
+      else{const jparts=await api('GET','/jobs/'+jobId+'/parts');const found=jparts.find(p=>p.part_id===item.id&&p.status==='staged');if(!found){errs.push(item.name+': not staged on job');continue;}await api('POST','/jobs/'+jobId+'/parts/'+found.id+'/signout',{qty:item.qty});}
+      ok++;
+    }catch(e){errs.push(item.name+': '+e.message);}
+  }
+  addRecent(cart.mode,jobId,items);renderRecent();cart.items={};renderCart();await loadJobs();
+  if(errs.length)toast(ok+' done \u2013 '+errs[0],4000);else toast((cart.mode==='stage'?'Staged ':'Signed out ')+ok);
+}
+function addRecent(type,jobId,items){recent.unshift({type,jobId,items:[...items],user:CU?.name,time:new Date().toLocaleTimeString()});if(recent.length>20)recent=recent.slice(0,20);localStorage.setItem('wh_recent',JSON.stringify(recent));}
+function renderRecent(){
+  const el=document.getElementById('s-recent');if(!el)return;
+  if(!recent.length){el.innerHTML='<div class="empty">No activity yet</div>';return;}
+  el.innerHTML=recent.map(r=>{
+    const total=r.items.reduce((a,i)=>a+i.qty,0);
+    const names=r.items.map(i=>i.name!==i.id?i.name:i.id).slice(0,3).join(', ')+(r.items.length>3?' +more':'');
+    return `<div class="prow"><div class="pi"><div class="pid">${r.type==='stage'?'Staged':'Signed out'}: ${r.items.length} type${r.items.length!==1?'s':''}, ${total} total<span class="badge ${r.type==='stage'?'b-staged':'b-out'}">${r.type}</span></div><div class="pn">Job ${r.jobId} \u00b7 ${names}</div><div class="pa">${r.user||''} \u00b7 ${r.time}</div></div></div>`;
+  }).join('');
+}
+
+// JOBS
+async function loadJobs(){try{const d=await api('GET','/jobs');jobs={};d.forEach(j=>jobs[j.id]=j);}catch(e){}}
+async function createJob(){
+  const id=document.getElementById('cj-id').value.trim();if(!id){toast('Job ID required');return;}
+  try{
+    const j=await api('POST','/jobs',{id,name:document.getElementById('cj-name').value.trim(),address:document.getElementById('cj-addr').value.trim(),gc_company:document.getElementById('cj-gcc').value.trim(),gc_contact:document.getElementById('cj-gcn').value.trim(),gc_phone:document.getElementById('cj-gcp').value.trim(),gc_email:document.getElementById('cj-gce').value.trim(),super_name:document.getElementById('cj-supn').value.trim(),super_phone:document.getElementById('cj-supp').value.trim()});
+    hideEl('create-job-modal');['cj-id','cj-name','cj-addr','cj-gcc','cj-gcn','cj-gcp','cj-gce','cj-supn','cj-supp'].forEach(id2=>document.getElementById(id2).value='');
+    jobs[j.id]=j;renderJobs();toast('Job created: '+j.id);showJob(j.id);
+  }catch(e){toast('Error: '+e.message);}
+}
+const phaseLabels={not_started:'Not Started',rough_in:'Rough-in',trim_out:'Trim-out',inspection:'Inspection',complete:'Complete',on_hold:'On Hold'};
+const phaseColors={not_started:'var(--text3)',rough_in:'var(--amber-t)',trim_out:'var(--blue-t)',inspection:'var(--purple-t)',complete:'var(--green-t)',on_hold:'var(--red-t)'};
+function renderJobs(){
+  const q=(document.getElementById('j-search')?.value||'').toLowerCase();
+  const showArch=document.getElementById('j-arch')?.checked;
+  const el=document.getElementById('j-list');if(!el)return;
+  const list=Object.values(jobs).filter(j=>(!j.archived||showArch)&&(!q||j.id.toLowerCase().includes(q)||(j.name||'').toLowerCase().includes(q)||(j.address||'').toLowerCase().includes(q))).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  if(!list.length){el.innerHTML='<div class="empty">No jobs yet</div>';return;}
+  el.innerHTML=list.map(j=>`<div class="job-card" onclick="showJob('${j.id}')">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div><div style="font-size:16px;font-weight:700">${j.id}${j.archived?'<span class="badge" style="background:var(--bg3);color:var(--text3)">archived</span>':''}</div><div style="font-size:13px;color:var(--text2);margin-top:2px">${j.name||''}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${j.address||''}</div></div>
+      <div style="text-align:right;flex-shrink:0"><div style="font-size:13px;font-weight:500;color:${phaseColors[j.phase]||'var(--text3)'}">${phaseLabels[j.phase]||'--'}</div>${j.pct_complete>0?'<div style="font-size:12px;color:var(--text2)">'+j.pct_complete+'%</div>':''}</div>
+    </div>
+    ${j.gc_company?'<div class="pa" style="margin-top:6px">GC: '+j.gc_company+(j.gc_contact?' \u00b7 '+j.gc_contact:'')+'</div>':''}
+    ${j.date_next_visit?'<div class="pa">Next visit: '+fmtDate(j.date_next_visit)+'</div>':''}
+  </div>`).join('');
+}
+function showJob(id){hideEl('jl-view');showEl('jd-view');openJobDetail(id,'profile');}
+function backJobs(){showEl('jl-view');hideEl('jd-view');renderJobs();}
+
+// JOB DETAIL
+async function openJobDetail(jobId,tab){
+  const job=jobs[jobId];if(!job){try{const j=await api('GET','/jobs/'+jobId);jobs[j.id]=j;}catch(e){toast('Job not found');return;}}
+  const j=jobs[jobId];if(!j)return;
+  const phases=['not_started','rough_in','trim_out','inspection','complete'];
+  const phaseIdx=phases.indexOf(j.phase);
+  const phaseBars=phases.map((ph,i)=>`<div class="phase-step ${i<phaseIdx?'done':i===phaseIdx?'active':''}"></div>`).join('');
+  const tabs=['profile','schedule','parts','logs','alerts','requests','photos','plans','status'];
+  const tabLabels=['Profile','Schedule','Parts','Daily Log','GC Alerts','Requests','Photos','Plans','Status'];
+  const dv=document.getElementById('jd-view');
+  dv.innerHTML=`<button class="backbtn" onclick="backJobs()">&#8249; Jobs</button>
+    <div style="font-size:20px;font-weight:700;margin-bottom:2px">${j.id}</div>
+    ${j.name?'<div style="font-size:14px;color:var(--text2);margin-bottom:2px">'+j.name+'</div>':''}
+    ${j.address?'<div style="font-size:12px;color:var(--text3);margin-bottom:8px">'+j.address+'</div>':''}
+    <div class="phase-bar">${phaseBars}</div>
+    <div class="tab-row">${tabs.map((t,i)=>'<button class="tab-btn '+(tab===t?'active':'')+'" onclick="openJobDetail(\''+jobId+'\',\''+t+'\')">'+tabLabels[i]+'</button>').join('')}</div>
+    <div id="jd-tab"></div>`;
+  const el=document.getElementById('jd-tab');
+  if(tab==='profile')await renderJobProfile(jobId,el);
+  else if(tab==='schedule')renderJobSchedule(jobId,el);
+  else if(tab==='parts')await renderJobParts(jobId,el);
+  else if(tab==='logs')await renderJobLogs(jobId,el);
+  else if(tab==='alerts')await renderJobAlerts(jobId,el);
+  else if(tab==='requests')await renderJobRequests(jobId,el);
+  else if(tab==='photos')await renderJobPhotos(jobId,el);
+  else if(tab==='plans')await renderJobPlans(jobId,el);
+  else if(tab==='status')renderJobStatus(jobId,el);
+}
+
+async function renderJobProfile(jobId,el){
+  const j=jobs[jobId];
+  const canEdit=['admin','stager','foreman'].includes(CU?.role);
+  el.innerHTML=`
+    <div class="card" style="margin-bottom:10px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">GENERAL CONTRACTOR</div>
+      <div class="prow" style="padding:5px 0"><div class="pi"><div class="pn">Company</div><div class="pid">${j.gc_company||'--'}</div></div></div>
+      <div class="prow" style="padding:5px 0"><div class="pi"><div class="pn">Contact</div><div class="pid">${j.gc_contact||'--'}</div></div></div>
+      <div class="prow" style="padding:5px 0"><div class="pi"><div class="pn">Phone</div><div class="pid">${j.gc_phone?'<a href="tel:'+j.gc_phone+'" style="color:var(--blue-t)">'+j.gc_phone+'</a>':'--'}</div></div></div>
+      <div class="prow" style="padding:5px 0;border-bottom:none"><div class="pi"><div class="pn">Email</div><div class="pid">${j.gc_email?'<a href="mailto:'+j.gc_email+'" style="color:var(--blue-t)">'+j.gc_email+'</a>':'--'}</div></div></div>
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">SUPERINTENDENT</div>
+      <div class="prow" style="padding:5px 0"><div class="pi"><div class="pn">Name</div><div class="pid">${j.super_name||'--'}</div></div></div>
+      <div class="prow" style="padding:5px 0;border-bottom:none"><div class="pi"><div class="pn">Phone</div><div class="pid">${j.super_phone?'<a href="tel:'+j.super_phone+'" style="color:var(--blue-t)">'+j.super_phone+'</a>':'--'}</div></div></div>
+    </div>
+    ${j.scope?'<div class="sec" style="margin-top:0">Scope of Work</div><div class="card" style="font-size:14px;line-height:1.6;white-space:pre-wrap;margin-bottom:10px">'+j.scope+'</div>':''}
+    ${j.notes?'<div class="sec" style="margin-top:0">Job Notes</div><div class="card" style="font-size:14px;line-height:1.6;white-space:pre-wrap;margin-bottom:10px">'+j.notes+'</div>':''}
+    ${canEdit?'<button class="btn btn-b" onclick="showEditProfile(\''+jobId+'\')">Edit Profile</button>':''}
+    <div class="pa" style="margin-top:10px">Created by ${j.created_by||'--'} \u00b7 ${fmtDate(j.created_at)}</div>`;
+}
+function showEditProfile(jobId){
+  const j=jobs[jobId];const el=document.getElementById('jd-tab');
+  el.innerHTML=`
+    <div class="fl nt">Job name</div><input type="text" id="ep-name" value="${j.name||''}" style="margin-bottom:8px"/>
+    <div class="fl">Site address</div><input type="text" id="ep-addr" value="${j.address||''}" style="margin-bottom:8px"/>
+    <div class="fl">GC Company</div><input type="text" id="ep-gcc" value="${j.gc_company||''}" style="margin-bottom:8px"/>
+    <div class="fl">GC Contact</div><input type="text" id="ep-gcn" value="${j.gc_contact||''}" style="margin-bottom:8px"/>
+    <div class="fl">GC Phone</div><input type="tel" id="ep-gcp" value="${j.gc_phone||''}" style="margin-bottom:8px"/>
+    <div class="fl">GC Email</div><input type="email" id="ep-gce" value="${j.gc_email||''}" style="margin-bottom:8px"/>
+    <div class="fl">Superintendent</div><input type="text" id="ep-supn" value="${j.super_name||''}" style="margin-bottom:8px"/>
+    <div class="fl">Super phone</div><input type="tel" id="ep-supp" value="${j.super_phone||''}" style="margin-bottom:8px"/>
+    <div class="fl">Super email</div><input type="email" id="ep-supe" value="${j.super_email||''}" style="margin-bottom:8px"/>
+    <div class="fl">Scope of work</div><textarea id="ep-scope" style="margin-bottom:8px">${j.scope||''}</textarea>
+    <div class="fl">Job notes</div><textarea id="ep-notes" style="margin-bottom:10px">${j.notes||''}</textarea>
+    <div class="row"><button class="btn btn-p" onclick="saveProfile('${jobId}')" style="flex:2">Save</button><button class="btn" onclick="openJobDetail('${jobId}','profile')">Cancel</button></div>`;
+}
+async function saveProfile(jobId){
+  const upd={name:document.getElementById('ep-name').value.trim(),address:document.getElementById('ep-addr').value.trim(),gc_company:document.getElementById('ep-gcc').value.trim(),gc_contact:document.getElementById('ep-gcn').value.trim(),gc_phone:document.getElementById('ep-gcp').value.trim(),gc_email:document.getElementById('ep-gce').value.trim(),super_name:document.getElementById('ep-supn').value.trim(),super_phone:document.getElementById('ep-supp').value.trim(),super_email:document.getElementById('ep-supe').value.trim(),scope:document.getElementById('ep-scope').value.trim(),notes:document.getElementById('ep-notes').value.trim()};
+  try{const j2=await api('PUT','/jobs/'+jobId,upd);jobs[jobId]={...jobs[jobId],...j2};openJobDetail(jobId,'profile');toast('Saved');}catch(e){toast(e.message);}
+}
+
+function renderJobSchedule(jobId,el){
+  const j=jobs[jobId];
+  const canEdit=['admin','stager','foreman'].includes(CU?.role);
+  const dfs=[{key:'date_contract',label:'Contract Signed'},{key:'date_permit',label:'Permit Date'},{key:'date_start',label:'On-Site Start'},{key:'date_roughin',label:'Rough-in Complete'},{key:'date_trimout',label:'Trim-out Complete'},{key:'date_inspection',label:'Inspection Date'},{key:'date_next_visit',label:'Next Visit'},{key:'date_closeout',label:'Closeout Date'},{key:'date_co',label:'CO Date'}];
+  if(canEdit){
+    el.innerHTML=dfs.map((df,i)=>{
+      const days=daysUntil(j[df.key]);
+      const dayStr=days!==null?(days<0?'<span style="color:var(--red-t);font-size:10px"> ('+Math.abs(days)+'d overdue)</span>':days===0?'<span style="color:var(--amber-t);font-size:10px"> (Today)</span>':days<=14?'<span style="color:var(--amber-t);font-size:10px"> ('+days+'d)</span>':''):'';
+      return '<div class="fl '+(i===0?'nt':'')+'">'+df.label+dayStr+'</div><input type="date" id="sd-'+df.key+'" value="'+(j[df.key]||'')+'" style="margin-bottom:8px"/>';
+    }).join('')+'<button class="btn btn-p" style="margin-top:4px" onclick="saveSchedule(\''+jobId+'\')">Save Schedule</button>';
+  }else{
+    const rows=dfs.filter(df=>j[df.key]).map(df=>{
+      const days=daysUntil(j[df.key]);let style='';
+      if(days!==null&&days>=0&&days<=14)style='color:var(--amber-t);font-weight:600';
+      if(days!==null&&days<0)style='color:var(--red-t);font-weight:600';
+      const di=days!==null?(' ('+(days<0?Math.abs(days)+'d overdue':days===0?'Today':days+'d away')+')'):'';
+      return '<div class="prow"><div class="pi"><div class="pn">'+df.label+'</div><div class="pid" style="'+style+'">'+fmtDate(j[df.key])+di+'</div></div></div>';
+    }).join('');
+    el.innerHTML=rows||'<div class="empty">No dates set</div>';
+  }
+}
+async function saveSchedule(jobId){
+  const dfs=['date_contract','date_permit','date_start','date_roughin','date_trimout','date_inspection','date_next_visit','date_closeout','date_co'];
+  const upd={};dfs.forEach(k=>{const el=document.getElementById('sd-'+k);if(el)upd[k]=el.value||null;});
+  try{const j2=await api('PUT','/jobs/'+jobId,upd);jobs[jobId]={...jobs[jobId],...j2};toast('Schedule saved');}catch(e){toast(e.message);}
+}
+
+function renderJobStatus(jobId,el){
+  const j=jobs[jobId];
+  const phases=[{v:'not_started',l:'Not Started'},{v:'rough_in',l:'Rough-in'},{v:'trim_out',l:'Trim-out'},{v:'inspection',l:'Inspection'},{v:'complete',l:'Complete'},{v:'on_hold',l:'On Hold'}];
+  const canEdit=['admin','stager','foreman','technician'].includes(CU?.role);
+  el.innerHTML=`<div class="fl nt">Phase</div>
+    <select id="st-phase" style="margin-bottom:12px">${phases.map(p=>'<option value="'+p.v+'" '+(j.phase===p.v?'selected':'')+'>'+p.l+'</option>').join('')}</select>
+    <div class="fl">% Complete</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <input type="range" id="st-pct" min="0" max="100" step="5" value="${j.pct_complete||0}" style="flex:1" oninput="document.getElementById('pct-val').textContent=this.value+'%'"/>
+      <span id="pct-val" style="font-size:16px;font-weight:600;min-width:42px">${j.pct_complete||0}%</span>
+    </div>
+    ${canEdit?'<button class="btn btn-p" onclick="saveStatus(\''+jobId+'\')">Save Status</button>':''}
+    <div class="divider"></div>
+    <div class="pa" style="margin-bottom:8px">Archived jobs are hidden but all data is kept.</div>
+    ${j.archived?'<button class="btn btn-b" onclick="archiveJob(\''+jobId+'\',false)">Unarchive</button>':'<button class="btn btn-w" onclick="archiveJob(\''+jobId+'\',true)">Archive job</button>'}`;
+}
+async function saveStatus(jobId){
+  const phase=document.getElementById('st-phase')?.value;const pct=parseInt(document.getElementById('st-pct')?.value)||0;
+  try{const j2=await api('PUT','/jobs/'+jobId,{phase,pct_complete:pct});jobs[jobId]={...jobs[jobId],...j2};toast('Status saved');openJobDetail(jobId,'status');}catch(e){toast(e.message);}
+}
+async function archiveJob(jobId,arch){try{const j2=await api('PUT','/jobs/'+jobId,{archived:arch});jobs[jobId]={...jobs[jobId],...j2};openJobDetail(jobId,'status');toast(arch?'Archived':'Unarchived');}catch(e){toast(e.message);}}
+
+async function renderJobParts(jobId,el){
+  try{
+    const parts=await api('GET','/jobs/'+jobId+'/parts');
+    const mf=await api('GET','/jobs/'+jobId+'/manifest');
+    const canStage=['admin','stager','foreman'].includes(CU?.role);
+    const canInstall=['technician','foreman','admin'].includes(CU?.role);
+    const staged=parts.filter(p=>p.status==='staged');
+    const out=parts.filter(p=>p.status==='signed_out');
+    const inst=parts.filter(p=>p.status==='installed'||p.status==='partial_install');
+    const over=parts.filter(p=>p.over);
+    let html=`<div class="mf-stats"><div class="mf-stat"><div class="msv" style="color:var(--amber-t)">${staged.length}</div><div class="msl">staged</div></div><div class="mf-stat"><div class="msv" style="color:var(--blue-t)">${out.length}</div><div class="msl">signed out</div></div><div class="mf-stat"><div class="msv" style="color:var(--teal-t)">${inst.length}</div><div class="msl">installed</div></div><div class="mf-stat"><div class="msv" style="color:${over.length?'var(--red-t)':'var(--text3)'}">${over.length}</div><div class="msl">over</div></div></div>`;
+    if(over.length)html+=`<div class="over-flag"><div class="ot">Overages: ${over.length}</div><div class="om">${over.map(p=>p.part_name+': assigned '+p.assigned_qty+', taken '+p.taken_qty).join('<br>')}</div></div>`;
+    if(mf.length){
+      const done=mf.filter(m=>m.staged_status==='installed'||m.staged_status==='signed_out').length;
+      const stgd=mf.filter(m=>m.staged_status==='staged').length;
+      const total=mf.length;const pct=total?Math.round((done+stgd)/total*100):0;
+      html+=`<div class="sec">Checklist (${total})</div><div class="mf-prog"><div class="mf-prog-bar" style="width:${pct}%"></div></div><div style="font-size:11px;color:var(--text2);text-align:right;margin-bottom:10px">${pct}% staged or picked up</div>`;
+      html+=mf.map(m=>{
+        let cc,ci;
+        if(m.staged_status==='installed'){cc='mfc-inst';ci='&#9745;';}
+        else if(m.staged_status==='signed_out'){cc='mfc-done';ci='&#10003;';}
+        else if(m.staged_status==='staged'){cc='mfc-staged';ci='&#8593;';}
+        else{cc='mfc-miss';ci='o';}
+        const audit=[m.staged_by?'Staged: '+m.staged_by:'',m.signed_out_by?'Out: '+m.signed_out_by:'',m.installed_by?'Installed: '+m.installed_by:''].filter(Boolean).join(' \u00b7 ');
+        return `<div class="mf-item"><div class="mf-check ${cc}">${ci}</div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">${m.part_name}</div><div class="pn">${m.part_id}${m.expected_qty>1?' \u00b7 qty: '+m.expected_qty:''}</div>${audit?'<div class="pa">'+audit+'</div>':''}</div>${canEdit?'<button class="ib" style="color:var(--red-t)" onclick="rmMf(\''+jobId+'\',\''+m.id+'\')">&#215;</button>':''}</div>`;
+      }).join('');
+    }
+    if(parts.length){
+      html+=`<div class="sec">All parts</div>`;
+      html+=parts.map(p=>`<div class="prow"><div class="pi"><div class="pid">${p.part_name}${p.over?'<span class="badge b-over">over</span>':''}</div><div class="pn">${p.part_id} \u00b7 qty: ${p.assigned_qty}</div><div class="pa">Staged: ${p.staged_by||'--'}${p.signed_out_by?'<br>Out: '+p.signed_out_by:''}${p.installed_by?'<br>Installed: '+p.installed_by:''}</div></div><div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end"><span class="ps ${p.status==='installed'||p.status==='partial_install'?'s-inst':p.status==='signed_out'?'s-out':p.over?'s-over':'s-staged'}">${p.status.replace('_',' ')}</span>${p.status==='staged'&&canStage?'<button class="ib" onclick="signOutPart(\''+jobId+'\',\''+p.id+'\')" title="Sign out">&#10003;</button>':''}${(p.status==='signed_out'||p.status==='partial_install')&&canInstall?'<button class="ib" style="background:var(--teal-bg);color:var(--teal-t);border-color:var(--teal-b)" onclick="installPart(\''+jobId+'\',\''+p.id+'\')" title="Mark installed">&#9673;</button>':''}${canStage?'<button class="ib" style="color:var(--red-t)" onclick="returnPart(\''+jobId+'\',\''+p.id+'\')" title="Return">&#8617;</button>':''}</div></div>`).join('');
+    }
+    const canEdit=['admin','stager','foreman'].includes(CU?.role);
+    if(canEdit)html+=`<div class="divider"></div><div class="fl">Add to checklist</div><div style="display:flex;gap:8px;margin-bottom:6px"><input type="text" id="jdp-bc" placeholder="Barcode" style="flex:1;margin-bottom:0" oninput="resolveBC(this.value,'jdp-res')"/><input type="text" id="jdp-qty" placeholder="Qty" style="width:56px;margin-bottom:0"/><button class="btn btn-sm btn-p" onclick="addToMf('${jobId}')">Add</button></div><div id="jdp-res" style="display:none;margin-bottom:8px"></div><button class="btn btn-d" onclick="retAll('${jobId}')">Return all staged to stock</button>`;
+    el.innerHTML=html;
+  }catch(e){el.innerHTML='<div class="empty">Error: '+e.message+'</div>';}
+}
+async function rmMf(jobId,mfId){if(!confirm('Remove from checklist?'))return;try{await api('DELETE','/jobs/'+jobId+'/manifest/'+mfId);openJobDetail(jobId,'parts');toast('Removed');}catch(e){toast(e.message);}}
+async function signOutPart(jobId,partId){try{await api('POST','/jobs/'+jobId+'/parts/'+partId+'/signout',{qty:1});toast('Signed out');openJobDetail(jobId,'parts');}catch(e){toast(e.message);}}
+async function installPart(jobId,partId){try{await api('POST','/jobs/'+jobId+'/parts/'+partId+'/install',{qty:1});toast('Marked installed');openJobDetail(jobId,'parts');}catch(e){toast(e.message);}}
+async function returnPart(jobId,partId){try{await api('POST','/jobs/'+jobId+'/parts/'+partId+'/return');openJobDetail(jobId,'parts');toast('Returned');}catch(e){toast(e.message);}}
+async function retAll(jobId){const parts=await api('GET','/jobs/'+jobId+'/parts').catch(()=>[]);const staged=parts.filter(p=>p.status==='staged');for(const p of staged){try{await api('POST','/jobs/'+jobId+'/parts/'+p.id+'/return');}catch(e){}}openJobDetail(jobId,'parts');toast('Returned '+staged.length);}
+async function addToMf(jobId){const bc=document.getElementById('jdp-bc')?.value.trim();if(!bc){toast('Enter barcode');return;}const qty=parseInt(document.getElementById('jdp-qty')?.value.trim())||1;const p=lookup(bc);const nm=p?p.name:bc;try{await api('POST','/jobs/'+jobId+'/manifest',{partId:p?p.barcode:bc,part_name:nm,expectedQty:qty});openJobDetail(jobId,'parts');toast('Added: '+nm);}catch(e){toast('Error: '+e.message);}}
+
+async function renderJobLogs(jobId,el){
+  const logs=await api('GET','/jobs/'+jobId+'/logs').catch(()=>[]);
+  el.innerHTML=`<div class="fl nt">Add entry</div>
+    <select id="log-type" style="margin-bottom:8px"><option value="note">Daily Note</option><option value="gc_communication">GC Communication</option><option value="progress">Progress Update</option><option value="issue">Issue / Concern</option></select>
+    <textarea id="log-content" placeholder="Enter notes..." style="margin-bottom:8px"></textarea>
+    <button class="btn btn-p" onclick="addLog('${jobId}')" style="margin-bottom:14px">Add Entry</button>
+    <div class="sec" style="margin-top:0">Log History</div>
+    ${logs.length?logs.map(l=>{const tc={note:'var(--text2)',gc_communication:'var(--blue-t)',progress:'var(--green-t)',issue:'var(--red-t)'};const tl={note:'Note',gc_communication:'GC Comm',progress:'Progress',issue:'Issue'};return '<div class="prow"><div class="pi"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--bg2);color:'+(tc[l.type]||'var(--text2)')+'">'+( tl[l.type]||l.type)+'</span><span class="pa">'+l.author+' \u00b7 '+fmtDate(l.created_at)+'</span></div><div style="font-size:14px;line-height:1.6;white-space:pre-wrap">'+l.content+'</div></div></div>';}).join(''):'<div class="empty">No entries yet</div>'}`;
+}
+async function addLog(jobId){const content=document.getElementById('log-content')?.value.trim();const type=document.getElementById('log-type')?.value||'note';if(!content){toast('Enter content');return;}try{await api('POST','/jobs/'+jobId+'/logs',{content,type});openJobDetail(jobId,'logs');toast('Entry added');}catch(e){toast(e.message);}}
+
+async function renderJobAlerts(jobId,el){
+  const alerts=await api('GET','/jobs/'+jobId+'/alerts').catch(()=>[]);
+  el.innerHTML=`<div class="fl nt">New GC Alert</div>
+    <input type="text" id="al-title" placeholder="Alert title / RFI / issue" style="margin-bottom:8px"/>
+    <textarea id="al-desc" placeholder="Details, directive, RFI number..." style="margin-bottom:8px"></textarea>
+    <select id="al-priority" style="margin-bottom:10px"><option value="normal">Normal</option><option value="urgent">Urgent</option><option value="critical">Critical</option></select>
+    <button class="btn btn-d" onclick="addAlert('${jobId}')" style="margin-bottom:14px">Submit Alert</button>
+    <div class="sec" style="margin-top:0">Open Alerts</div>
+    ${alerts.filter(a=>a.status==='open').length?alerts.filter(a=>a.status==='open').map(a=>`<div class="prow"><div class="pi"><div class="pid">${a.title}<span class="badge ${a.priority==='critical'?'b-over':a.priority==='urgent'?'b-pending':''}">${a.priority}</span></div>${a.description?'<div class="pn" style="white-space:pre-wrap">'+a.description+'</div>':''}<div class="pa">${a.created_by} \u00b7 ${fmtDate(a.created_at)}</div></div><button class="btn btn-sm btn-g" onclick="resolveAlert('${jobId}','${a.id}')">Resolve</button></div>`).join(''):'<div class="empty">No open alerts</div>'}
+    ${alerts.filter(a=>a.status==='resolved').length?'<div class="sec">Resolved</div>'+alerts.filter(a=>a.status==='resolved').map(a=>`<div class="prow"><div class="pi"><div class="pid" style="text-decoration:line-through;opacity:.6">${a.title}</div><div class="pa">${a.created_by} \u00b7 ${fmtDate(a.created_at)}</div></div></div>`).join(''):''}`;
+}
+async function addAlert(jobId){const title=document.getElementById('al-title')?.value.trim();if(!title){toast('Enter a title');return;}const desc=document.getElementById('al-desc')?.value.trim();const priority=document.getElementById('al-priority')?.value||'normal';try{await api('POST','/jobs/'+jobId+'/alerts',{title,description:desc,priority});openJobDetail(jobId,'alerts');toast('Alert submitted');}catch(e){toast(e.message);}}
+async function resolveAlert(jobId,alertId){try{await api('PUT','/jobs/'+jobId+'/alerts/'+alertId,{status:'resolved',resolved_at:new Date().toISOString()});openJobDetail(jobId,'alerts');toast('Resolved');}catch(e){toast(e.message);}}
+
+async function renderJobRequests(jobId,el){
+  const reqs=await api('GET','/jobs/'+jobId+'/requests').catch(()=>[]);
+  const canApprove=['admin','foreman'].includes(CU?.role);
+  el.innerHTML=`<div class="fl nt">Request a part</div>
+    <input type="text" id="req-pn" placeholder="Part name or barcode" style="margin-bottom:8px"/>
+    <input type="text" id="req-qty" placeholder="Qty needed" style="margin-bottom:8px"/>
+    <textarea id="req-reason" placeholder="Why needed, urgency..." style="margin-bottom:10px"></textarea>
+    <button class="btn btn-w" onclick="addRequest('${jobId}')" style="margin-bottom:14px">Submit Request</button>
+    <div class="sec" style="margin-top:0">Requests</div>
+    ${reqs.length?reqs.map(r=>`<div class="prow"><div class="pi"><div class="pid">${r.part_name||r.part_id}<span class="badge ${r.status==='approved'?'b-inst':r.status==='rejected'?'b-over':'b-pending'}">${r.status}</span></div><div class="pn">Qty: ${r.qty} \u00b7 ${r.created_by} \u00b7 ${fmtDate(r.created_at)}</div>${r.reason?'<div class="pa">'+r.reason+'</div>':''}${r.approved_by?'<div class="pa" style="color:var(--green-t)">Approved by '+r.approved_by+'</div>':''}</div>${canApprove&&r.status==='pending'?'<div style="display:flex;flex-direction:column;gap:4px"><button class="btn btn-sm btn-g" onclick="updateReq(\''+jobId+'\',\''+r.id+'\',\'approved\')">Approve</button><button class="btn btn-sm btn-d" onclick="updateReq(\''+jobId+'\',\''+r.id+'\',\'rejected\')">Reject</button></div>':''}</div>`).join(''):'<div class="empty">No requests yet</div>'}`;
+}
+async function addRequest(jobId){const pn=document.getElementById('req-pn')?.value.trim();if(!pn){toast('Enter part name');return;}const p=lookup(pn);const qty=parseInt(document.getElementById('req-qty')?.value.trim())||1;const reason=document.getElementById('req-reason')?.value.trim();try{await api('POST','/jobs/'+jobId+'/requests',{part_id:p?p.barcode:pn,part_name:p?p.name:pn,qty,reason});openJobDetail(jobId,'requests');toast('Request submitted');}catch(e){toast(e.message);}}
+async function updateReq(jobId,reqId,status){try{await api('PUT','/jobs/'+jobId+'/requests/'+reqId,{status});openJobDetail(jobId,'requests');toast(status);}catch(e){toast(e.message);}}
+
+async function renderJobPhotos(jobId,el){
+  const photos=await api('GET','/jobs/'+jobId+'/photos').catch(()=>[]);
+  el.innerHTML=`<div class="fl nt">Add photos</div>
+    <label class="btn btn-b" style="text-align:center;cursor:pointer;margin-bottom:8px;display:block">&#128247; Take photo / Upload from library<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="uploadPhotos(this,'${jobId}')"></label>
+    <div id="ph-progress" style="display:none"><div class="upload-progress"><div class="upload-progress-bar" id="ph-prog-bar" style="width:0%"></div></div><div style="font-size:12px;color:var(--text2);text-align:center;margin-top:4px" id="ph-prog-txt">Uploading...</div></div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px">Photos (${photos.length})</div>
+    <div class="photo-grid">${photos.map(p=>`<div class="photo-thumb"><img src="${p.url}" loading="lazy" onclick="window.open('${p.url}','_blank')"/>${p.caption?'<div class="ph-cap">'+p.caption+'</div>':''}<button class="del-ph" onclick="deletePhoto('${jobId}','${p.id}')">&#215;</button></div>`).join('')}</div>
+    ${!photos.length?'<div class="empty">No photos yet</div>':''}`;
+}
+async function uploadPhotos(input,jobId){
+  const files=Array.from(input.files);if(!files.length)return;
+  showEl('ph-progress');
+  for(let i=0;i<files.length;i++){
+    document.getElementById('ph-prog-bar').style.width=Math.round((i/files.length)*100)+'%';
+    document.getElementById('ph-prog-txt').textContent='Uploading '+(i+1)+' of '+files.length+'...';
+    try{
+      const signData=await api('POST','/upload-sign',{folder:'warehouse/'+jobId+'/photos'});
+      const fd=new FormData();fd.append('file',files[i]);fd.append('upload_preset',signData.upload_preset);fd.append('folder',signData.folder);
+      const r=await fetch('https://api.cloudinary.com/v1_1/'+CL_CLOUD+'/image/upload',{method:'POST',body:fd});
+      const d=await r.json();
+      await api('POST','/jobs/'+jobId+'/photos',{url:d.secure_url,public_id:d.public_id,type:'photo'});
+    }catch(e){toast('Upload error: '+e.message);}
+  }
+  document.getElementById('ph-prog-bar').style.width='100%';document.getElementById('ph-prog-txt').textContent='Done!';
+  setTimeout(()=>hideEl('ph-progress'),1500);openJobDetail(jobId,'photos');input.value='';
+}
+async function deletePhoto(jobId,photoId){if(!confirm('Delete photo?'))return;try{await api('DELETE','/jobs/'+jobId+'/photos/'+photoId);openJobDetail(jobId,'photos');toast('Deleted');}catch(e){toast(e.message);}}
+
+async function renderJobPlans(jobId,el){
+  const plans=await api('GET','/jobs/'+jobId+'/plans').catch(()=>[]);
+  el.innerHTML=`<div class="fl nt">Upload plan (PDF or image)</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" id="plan-name" placeholder="Plan name e.g. Floor Plan Rev B" style="flex:1;margin-bottom:0"/><label class="btn btn-b btn-sm" style="text-align:center;cursor:pointer;flex-shrink:0">Upload<input type="file" accept=".pdf,image/*" style="display:none" onchange="uploadPlan(this,'${jobId}')"></label></div>
+    <div id="plan-progress" style="display:none"><div class="upload-progress"><div class="upload-progress-bar" id="plan-prog-bar" style="width:0%"></div></div></div>
+    <div class="sec" style="margin-top:8px">Plans (${plans.length})</div>
+    ${plans.map(pl=>`<div class="plan-card"><div style="font-size:14px;font-weight:600">${pl.name||'Plan'}</div><div class="pa">Uploaded by ${pl.uploaded_by} \u00b7 ${fmtDate(pl.created_at)}</div>${pl.notes?'<div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.5">'+pl.notes+'</div>':''}<div class="plan-actions"><button class="btn btn-sm btn-b" onclick="window.open('${pl.url}','_blank')">View</button><button class="btn btn-sm btn-t" onclick="openMarkup('${jobId}','${pl.id}','${pl.url}','${(pl.name||'Plan').replace(/'/g,'')}','${pl.markup_url||''}','${(pl.notes||'').replace(/'/g,'').replace(/\n/g,' ')}')">Markup</button>${pl.markup_url?'<button class="btn btn-sm" onclick="window.open(\''+pl.markup_url+'\',\'_blank\')">View Markup</button>':''}<button class="btn btn-sm btn-d" onclick="deletePlan(\'${jobId}\',\'${pl.id}\')">Delete</button></div></div>`).join('')}
+    ${!plans.length?'<div class="empty">No plans uploaded yet</div>':''}`;
+}
+async function uploadPlan(input,jobId){
+  const file=input.files[0];if(!file)return;
+  const name=document.getElementById('plan-name')?.value.trim()||file.name.replace(/\.[^.]+$/,'');
+  showEl('plan-progress');document.getElementById('plan-prog-bar').style.width='30%';
+  try{
+    const signData=await api('POST','/upload-sign',{folder:'warehouse/'+jobId+'/plans'});
+    document.getElementById('plan-prog-bar').style.width='60%';
+    const fd=new FormData();fd.append('file',file);fd.append('upload_preset',signData.upload_preset);fd.append('folder',signData.folder);
+    const rt=file.type==='application/pdf'?'raw':'image';
+    const r=await fetch('https://api.cloudinary.com/v1_1/'+CL_CLOUD+'/'+rt+'/upload',{method:'POST',body:fd});
+    const d=await r.json();
+    document.getElementById('plan-prog-bar').style.width='90%';
+    await api('POST','/jobs/'+jobId+'/plans',{url:d.secure_url,public_id:d.public_id,name});
+    document.getElementById('plan-prog-bar').style.width='100%';setTimeout(()=>hideEl('plan-progress'),1000);
+    openJobDetail(jobId,'plans');if(document.getElementById('plan-name'))document.getElementById('plan-name').value='';input.value='';toast('Plan uploaded');
+  }catch(e){hideEl('plan-progress');toast('Upload error: '+e.message);}
+}
+async function deletePlan(jobId,planId){if(!confirm('Delete plan?'))return;try{await api('DELETE','/jobs/'+jobId+'/plans/'+planId);openJobDetail(jobId,'plans');toast('Deleted');}catch(e){toast(e.message);}}
+
+// MARKUP
+function openMarkup(jobId,planId,planUrl,planName,markupUrl,existingNotes){
+  currentMarkupPlan={id:planId,url:planUrl};currentMarkupJobId=jobId;
+  document.getElementById('markup-title').textContent=planName;
+  document.getElementById('markup-notes').value=existingNotes||'';
+  showEl('markup-modal');
+  const canvas=document.getElementById('markup-canvas');
+  markupCanvas=canvas;markupCtx=canvas.getContext('2d');markupImg=null;
+  if(planUrl.match(/\.(pdf)/i)||planUrl.includes('raw/upload')){
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfjsLib.getDocument(planUrl).promise.then(pdf=>pdf.getPage(1)).then(page=>{
+      const vp=page.getViewport({scale:1.5});canvas.width=vp.width;canvas.height=vp.height;
+      page.render({canvasContext:markupCtx,viewport:vp}).promise.then(()=>{if(markupUrl)loadMarkupOverlay(markupUrl);setupDrawing();});
+    }).catch(()=>toast('PDF preview not available -- use image plans for markup'));
+  }else{
+    const img=new Image();img.crossOrigin='anonymous';
+    img.onload=()=>{canvas.width=img.width;canvas.height=img.height;markupCtx.drawImage(img,0,0);markupImg=img;if(markupUrl)loadMarkupOverlay(markupUrl);setupDrawing();};
+    img.src=planUrl;
+  }
+}
+function loadMarkupOverlay(url){const m=new Image();m.crossOrigin='anonymous';m.onload=()=>markupCtx.drawImage(m,0,0,markupCanvas.width,markupCanvas.height);m.src=url;}
+function setupDrawing(){
+  const c=markupCanvas;
+  c.onmousedown=e=>{markupDrawing=true;markupCtx.beginPath();const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;markupCtx.moveTo((e.clientX-r.left)*sx,(e.clientY-r.top)*sy);};
+  c.onmousemove=e=>{if(!markupDrawing)return;const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;markupCtx.lineWidth=drawSize;markupCtx.strokeStyle=drawColor;markupCtx.lineCap='round';markupCtx.lineTo((e.clientX-r.left)*sx,(e.clientY-r.top)*sy);markupCtx.stroke();};
+  c.onmouseup=()=>{markupDrawing=false;};
+  c.ontouchstart=e=>{e.preventDefault();markupDrawing=true;markupCtx.beginPath();const r=c.getBoundingClientRect(),t=e.touches[0],sx=c.width/r.width,sy=c.height/r.height;markupCtx.moveTo((t.clientX-r.left)*sx,(t.clientY-r.top)*sy);};
+  c.ontouchmove=e=>{e.preventDefault();if(!markupDrawing)return;const r=c.getBoundingClientRect(),t=e.touches[0],sx=c.width/r.width,sy=c.height/r.height;markupCtx.lineWidth=drawSize;markupCtx.strokeStyle=drawColor;markupCtx.lineCap='round';markupCtx.lineTo((t.clientX-r.left)*sx,(t.clientY-r.top)*sy);markupCtx.stroke();};
+  c.ontouchend=()=>{markupDrawing=false;};
+}
+function setDrawColor(c,el){drawColor=c;document.querySelectorAll('.color-dot').forEach(d=>d.classList.remove('active'));el.classList.add('active');}
+function clearMarkup(){if(!markupCanvas)return;markupCtx.clearRect(0,0,markupCanvas.width,markupCanvas.height);if(markupImg)markupCtx.drawImage(markupImg,0,0);}
+document.getElementById('brush-size').addEventListener('input',e=>{drawSize=parseInt(e.target.value);});
+async function saveMarkup(){
+  if(!markupCanvas||!currentMarkupPlan)return;toast('Saving...');
+  markupCanvas.toBlob(async blob=>{
+    try{
+      const signData=await api('POST','/upload-sign',{folder:'warehouse/'+currentMarkupJobId+'/markups'});
+      const fd=new FormData();fd.append('file',blob,'markup.png');fd.append('upload_preset',signData.upload_preset);fd.append('folder',signData.folder);
+      const r=await fetch('https://api.cloudinary.com/v1_1/'+CL_CLOUD+'/image/upload',{method:'POST',body:fd});
+      const d=await r.json();
+      await api('PUT','/jobs/'+currentMarkupJobId+'/plans/'+currentMarkupPlan.id,{markup_url:d.secure_url,markup_public_id:d.public_id});
+      toast('Markup saved');
+    }catch(e){toast('Save error: '+e.message);}
+  },'image/png');
+}
+async function saveMarkupAndNotes(){
+  const notes=document.getElementById('markup-notes')?.value.trim()||'';
+  try{await api('PUT','/jobs/'+currentMarkupJobId+'/plans/'+currentMarkupPlan.id,{notes});}catch(e){}
+  await saveMarkup();hideEl('markup-modal');openJobDetail(currentMarkupJobId,'plans');
+}
+
+// ORDERS
+async function loadOrders(){try{ordersData=await api('GET','/orders');}catch(e){}}
+function addOrdPart(){
+  const bc=document.getElementById('ord-bc').value.trim();const qty=parseInt(document.getElementById('ord-qty').value.trim())||1;
+  if(!bc){toast('Enter barcode');return;}
+  const p=lookup(bc);const nm=p?p.name:bc;const cid=p?p.barcode:bc;
+  const ex=ordParts.find(x=>x.partId===cid);if(ex)ex.qty+=qty;else ordParts.push({partId:cid,name:nm,qty});
+  document.getElementById('ord-bc').value='';document.getElementById('ord-qty').value='';hideEl('ord-res');renderOrdParts();toast('Added: '+nm);
+}
+function renderOrdParts(){
+  const el=document.getElementById('ord-parts-list');
+  if(!ordParts.length){el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0;margin-bottom:4px">No parts added yet</div>';return;}
+  el.innerHTML='<div class="card" style="margin-bottom:8px">'+ordParts.map((p,i)=>`<div class="prow"><div class="pi"><div class="pid">${p.name!==p.partId?p.name:p.partId}</div><div class="pn">${p.partId} \u00b7 qty: ${p.qty}</div></div><button class="ib" style="color:var(--red-t)" onclick="ordParts.splice(${i},1);renderOrdParts()">&#215;</button></div>`).join('')+'</div>';
+}
+async function submitOrder(){
+  const jobId=document.getElementById('ord-job').value.trim();const notes=document.getElementById('ord-notes').value.trim();
+  if(!jobId){toast('Enter job ID');return;}if(!ordParts.length){toast('Add parts');return;}
+  try{await api('POST','/orders',{job_id:jobId,notes,items:ordParts});ordParts=[];document.getElementById('ord-job').value='';document.getElementById('ord-notes').value='';renderOrdParts();await loadOrders();renderOrders();toast('Request submitted');}
+  catch(e){toast('Error: '+e.message);}
+}
+function renderOrders(){
+  const el=document.getElementById('orders-list');if(!el)return;
+  if(!ordersData.length){el.innerHTML='<div class="empty">No orders yet</div>';return;}
+  el.innerHTML=ordersData.map(o=>{
+    const items=typeof o.items==='string'?JSON.parse(o.items):o.items||[];
+    const sc={pending:'b-pending',approved:'b-inst',staged:'b-inst',rejected:'b-over'}[o.status]||'b-staged';
+    const canAct=['admin','stager','foreman'].includes(CU?.role)&&o.status==='pending';
+    const canStage=['admin','stager','foreman'].includes(CU?.role)&&(o.status==='pending'||o.status==='approved');
+    return `<div class="card" style="margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between"><div style="font-size:14px;font-weight:600">Job ${o.job_id}<span class="badge ${sc}">${o.status}</span></div></div><div class="pa">${o.created_by} \u00b7 ${fmtDate(o.created_at)}</div><div style="font-size:13px;color:var(--text2);margin:6px 0;line-height:1.6">${items.map(i=>'&bull; '+i.name+(i.qty>1?' \xd7'+i.qty:'')).join('<br>')}</div>${o.notes?'<div style="font-size:12px;color:var(--text2)">'+o.notes+'</div>':''}${o.status==='rejected'&&o.rejection_note?'<div class="bb bb-err" style="margin-top:6px"><div class="bm">Rejected: '+o.rejection_note+'</div></div>':''}${canAct||canStage?'<div class="row" style="margin-top:10px">'+(canAct?'<button class="btn btn-sm btn-b" onclick="actOrder(\''+o.id+'\',\'approve\')">Approve</button>':'')+(canStage?'<button class="btn btn-sm btn-g" onclick="actOrder(\''+o.id+'\',\'stage\')">Stage Now</button>':'')+(canAct?'<button class="btn btn-sm btn-d" onclick="actOrder(\''+o.id+'\',\'reject\')">Reject</button>':'')+'</div>':''}`;
+  }).join('');
+}
+async function actOrder(id,action){
+  if(action==='reject'){const note=prompt('Reason?')||'';try{await api('POST','/orders/'+id+'/'+action,{note});}catch(e){toast(e.message);return;}}
+  else{try{await api('POST','/orders/'+id+'/'+action);}catch(e){toast(e.message);return;}}
+  await loadOrders();await loadJobs();renderOrders();await loadNotifs();renderNotifs();
+  toast(action==='stage'?'Parts staged':action==='approve'?'Approved':'Rejected');
+}
+
+// INVENTORY
+async function loadInv(){try{const d=await api('GET','/inventory');invData={};d.forEach(i=>invData[i.id]=i);}catch(e){}}
+async function addInv(){
+  const bc=document.getElementById('i-bc').value.trim();const nm=document.getElementById('i-nm').value.trim();const desc=document.getElementById('i-desc').value.trim();const minQ=parseInt(document.getElementById('i-min').value.trim())||0;const qty=parseInt(document.getElementById('i-qty').value.trim())||1;
+  if(!bc){toast('Scan or enter barcode');return;}
+  const nm2=nm||lookup(bc)?.name||bc;
+  try{
+    await api('POST','/inventory',{id:bc,name:nm2,description:desc,qty,min_qty:minQ});
+    if(nm&&!lookup(bc)){try{await api('POST','/catalog',{barcode:bc,name:nm,description:desc,part_number:'',category:'',alt_barcodes:[]});await loadCatalog();}catch(ex){}}
+    ['i-bc','i-nm','i-desc','i-min','i-qty'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    hideEl('inv-bc-res');await loadInv();renderInv();toast('Added '+qty+'x '+nm2);
+  }catch(e){toast('Error: '+e.message);}
+}
+function renderInv(){
+  const q=(document.getElementById('inv-search')?.value||'').toLowerCase();const el=document.getElementById('i-list');if(!el)return;
+  const items=Object.values(invData).filter(i=>!q||(i.name+i.id+(i.description||'')).toLowerCase().includes(q)).sort((a,b)=>a.name>b.name?1:-1);
+  if(!items.length){el.innerHTML='<div class="empty">No stock entered</div>';return;}
+  el.innerHTML=items.map(i=>{const low=i.min_qty>0&&i.qty<=i.min_qty;return `<div class="prow"><div class="pi"><div class="pid">${i.name!==i.id?i.name:i.id}${low?'<span class="badge b-over">low</span>':''}</div><div class="pn">${i.name!==i.id?i.id:''}</div>${i.description?'<div class="pa">'+i.description+'</div>':''}</div><div style="font-size:20px;font-weight:700;min-width:28px;text-align:right;color:${low?'var(--red-t)':'var(--text)'}">${i.qty}</div><div style="display:flex;gap:5px"><button class="ib" onclick="adjInv('${i.id}',1)">+</button><button class="ib" onclick="adjInv('${i.id}',-1)">-</button></div></div>`;}).join('');
+}
+async function adjInv(id,d){const item=invData[id];if(!item)return;try{await api('PUT','/inventory/'+encodeURIComponent(id),{qty:Math.max(0,item.qty+d)});await loadInv();renderInv();}catch(e){toast(e.message);}}
+
+// SCHEDULE
+async function loadSchedule(){
+  try{schedData=await api('GET','/schedule');}catch(e){schedData=[];}
+  renderSchedList();
+}
+function schedView(v){
+  if(v==='list'){showEl('sched-list-view');hideEl('sched-cal-view');document.getElementById('sched-list-btn').className='btn btn-sm btn-p';document.getElementById('sched-cal-btn').className='btn btn-sm';}
+  else{hideEl('sched-list-view');showEl('sched-cal-view');document.getElementById('sched-list-btn').className='btn btn-sm';document.getElementById('sched-cal-btn').className='btn btn-sm btn-p';renderCalendar();}
+}
+function renderSchedList(){
+  const el=document.getElementById('sched-list-view');if(!el)return;
+  if(!schedData.length){el.innerHTML='<div class="empty">No dates scheduled yet<br><br>Add dates to jobs via Jobs \u2192 Schedule tab</div>';return;}
+  const overdue=schedData.filter(s=>s.days_away<0);
+  const urgent=schedData.filter(s=>s.days_away>=0&&s.days_away<=14);
+  const upcoming=schedData.filter(s=>s.days_away>14);
+  let html='';
+  if(overdue.length)html+=`<div style="font-size:12px;font-weight:600;color:var(--red-t);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Overdue (${overdue.length})</div>`+overdue.map(s=>schedItem(s,'sched-urgent')).join('');
+  if(urgent.length)html+=`<div style="font-size:12px;font-weight:600;color:var(--amber-t);margin:12px 0 8px;text-transform:uppercase;letter-spacing:.04em">Next 14 days (${urgent.length})</div>`+urgent.map(s=>schedItem(s,'sched-soon')).join('');
+  if(upcoming.length)html+=`<div style="font-size:12px;font-weight:600;color:var(--text2);margin:12px 0 8px;text-transform:uppercase;letter-spacing:.04em">Upcoming</div>`+upcoming.map(s=>schedItem(s,'')).join('');
+  el.innerHTML=html;
+}
+function schedItem(s,cls){
+  const d=new Date(s.date);
+  return `<div class="sched-item ${cls}" onclick="showJob('${s.job_id}')">
+    <div class="sched-date-box"><div class="sd">${d.getDate()}</div><div class="sm">${d.toLocaleDateString('en-US',{month:'short'})}</div></div>
+    <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${s.job_id} \u00b7 ${s.date_type}</div><div class="pn">${s.job_name}</div>${s.address?'<div class="pa">'+s.address+'</div>':''}<div class="pa" style="color:${s.days_away<0?'var(--red-t)':s.days_away<=3?'var(--red-t)':s.days_away<=14?'var(--amber-t)':'var(--text3)'}">${s.days_away<0?Math.abs(s.days_away)+'d overdue':s.days_away===0?'TODAY':s.days_away+'d away'}</div></div>
+  </div>`;
+}
+function renderCalendar(){
+  const el=document.getElementById('sched-cal-view');if(!el)return;
+  const today=new Date();const year=today.getFullYear();const month=today.getMonth();
+  const firstDay=new Date(year,month,1).getDay();const daysInMonth=new Date(year,month+1,0).getDate();
+  const evts={};schedData.forEach(s=>{const d=new Date(s.date);if(d.getFullYear()===year&&d.getMonth()===month){const k=d.getDate();if(!evts[k])evts[k]=[];evts[k].push(s);}});
+  let html=`<div style="font-size:15px;font-weight:600;text-align:center;margin-bottom:10px">${today.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
+    <div class="cal-hdr">${['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<span>${d}</span>`).join('')}</div>
+    <div class="calendar-grid">`;
+  for(let i=0;i<firstDay;i++)html+='<div></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const isToday=d===today.getDate();const dots=(evts[d]||[]).slice(0,3).map(()=>'<div class="cal-dot"></div>').join('');
+    html+=`<div class="cal-day ${isToday?'today':''}" onclick="showCalDay(${year},${month+1},${d})"><div class="cal-num">${d}</div>${dots}</div>`;
+  }
+  html+='</div>';el.innerHTML=html;
+}
+function showCalDay(y,m,d){
+  const evts=schedData.filter(s=>{const sd=new Date(s.date);return sd.getFullYear()===y&&sd.getMonth()===m-1&&sd.getDate()===d;});
+  if(!evts.length){toast('No events this day');return;}
+  alert(evts.map(e=>e.job_id+': '+e.date_type+'\n'+(e.job_name||'')).join('\n\n'));
+}
+
+// DASHBOARD
+async function renderDash(){
+  const overdue=schedData.filter(s=>s.days_away<0);
+  const urgent14=schedData.filter(s=>s.days_away>=0&&s.days_away<=14);
+  let alertHtml='';
+  if(overdue.length||urgent14.length){
+    alertHtml='<div style="background:var(--bg2);border-radius:var(--r);border:.5px solid var(--border2);padding:14px;margin-bottom:12px"><div style="font-size:15px;font-weight:700;margin-bottom:10px">&#128197; Schedule Alerts</div>';
+    overdue.slice(0,3).forEach(s=>{alertHtml+=`<div class="alert-banner"><div class="at">OVERDUE: ${s.job_id} \u2014 ${s.date_type}</div><div class="am">${s.job_name} \u00b7 ${fmtDate(s.date)}</div></div>`;});
+    urgent14.slice(0,5).forEach(s=>{alertHtml+=`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:.5px solid var(--border2)"><div style="font-size:22px;font-weight:700;color:var(--amber-t);min-width:30px">${s.days_away===0?'!':s.days_away}</div><div><div style="font-size:13px;font-weight:500">${s.job_id} \u00b7 ${s.date_type}</div><div class="pa">${s.job_name} \u00b7 ${fmtDate(s.date)}</div></div></div>`;});
+    alertHtml+='</div>';
+  }
+  document.getElementById('dash-alerts').innerHTML=alertHtml;
+  try{const r=await api('GET','/report');document.getElementById('ds-jobs').textContent=r.jobs;document.getElementById('ds-staged').textContent=r.staged?.length||0;document.getElementById('ds-out').textContent=r.signedOut?.length||0;document.getElementById('ds-inst').textContent=r.installed?.length||0;}catch(e){}
+  const recentJobs=Object.values(jobs).filter(j=>!j.archived).slice(0,6);
+  document.getElementById('dash-jobs').innerHTML=recentJobs.length?recentJobs.map(j=>`<div class="job-card" onclick="showJob('${j.id}')"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div><div style="font-size:15px;font-weight:700">${j.id}</div><div style="font-size:13px;color:var(--text2);margin-top:2px">${j.name||''}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${j.address||''}</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:12px;font-weight:500;color:${phaseColors[j.phase]||'var(--text3)'}">${phaseLabels[j.phase]||'--'}</div>${j.pct_complete>0?'<div style="font-size:11px;color:var(--text2)">'+j.pct_complete+'%</div>':''}</div></div>${j.date_next_visit?'<div class="pa" style="margin-top:5px">Next visit: '+fmtDate(j.date_next_visit)+'</div>':''}</div>`).join(''):'<div class="empty">No jobs yet</div>';
+}
+
+// NOTIFICATIONS
+async function loadNotifs(){
+  try{notifData=await api('GET','/notifications');const unread=notifData.filter(n=>!n.read).length;const badge=document.getElementById('notif-badge');badge.textContent=unread>9?'9+':unread;badge.style.display=unread?'block':'none';}catch(e){}
+}
+function renderNotifs(){
+  const el=document.getElementById('notif-list');if(!el)return;if(!notifData.length){el.innerHTML='<div class="empty">No notifications</div>';return;}
+  const icons={low_stock:'&#9888;',new_order:'&#128230;',order_approved:'&#9989;',order_staged:'&#128230;',order_rejected:'&#10060;',overage:'&#9888;',gc_alert:'&#9888;',part_request:'&#128230;'};
+  el.innerHTML=notifData.map(n=>`<div class="notif-item" onclick="markRead('${n.id}')"><div class="notif-dot${n.read?' read':''}"></div><div style="flex:1"><div style="font-size:13px;font-weight:600">${icons[n.type]||'&#128276;'} ${n.title}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${n.message}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${fmtDate(n.created_at)}</div></div></div>`).join('');
+}
+async function markRead(id){try{await api('POST','/notifications/'+id+'/read');await loadNotifs();}catch(e){}}
+async function markAllRead(){try{await api('POST','/notifications/read-all');await loadNotifs();renderNotifs();toast('All read');}catch(e){}}
+async function clearNotifs(){if(!confirm('Clear all?'))return;try{await api('DELETE','/notifications');notifData=[];renderNotifs();loadNotifs();toast('Cleared');}catch(e){toast(e.message);}}
+
+// REPORTS
+async function renderReport(){
+  const fj=(document.getElementById('rpt-job')?.value||'').trim();const el=document.getElementById('report-body');el.innerHTML='<div class="empty">Loading...</div>';
+  try{
+    const data=await api('GET','/report'+(fj?'?job='+encodeURIComponent(fj):''));
+    const{staged,signedOut,installed,overages,lowStock}=data;
+    let html=`<div class="sum-cards"><div class="sum-card blue"><div class="sv">${data.jobs}</div><div class="sl">Active jobs</div></div><div class="sum-card amber"><div class="sv">${staged.length}</div><div class="sl">Staged</div></div><div class="sum-card green"><div class="sv">${signedOut.length}</div><div class="sl">Signed out</div></div><div class="sum-card"><div class="sv" style="color:var(--teal-t)">${installed.length}</div><div class="sl">Installed</div></div></div>`;
+    if(overages.length)html+=`<div class="over-flag" style="margin-bottom:14px"><div class="ot">Overages: ${overages.length}</div></div>`;
+    if(lowStock.length)html+=`<div class="bb bb-err" style="margin-bottom:14px"><div class="bm"><strong>Low stock: ${lowStock.length}</strong><br>${lowStock.map(i=>i.name+' ('+i.qty+' left, min: '+i.min_qty+')').join(', ')}</div></div>`;
+    const sec=(title,items,rowFn)=>`<div style="background:var(--bg2);border-radius:var(--r);border:.5px solid var(--border2);margin-bottom:14px;overflow:hidden"><div style="padding:12px 14px;border-bottom:.5px solid var(--border2);font-size:14px;font-weight:600">${title}</div><div style="padding:0 14px">${items.length?items.map(rowFn).join(''):'<div style="padding:12px 0;font-size:13px;color:var(--text2)">None.</div>'}</div></div>`;
+    html+=sec('Staged ('+staged.length+')',staged,p=>`<div class="prow"><div class="pi"><div style="font-size:13px;font-weight:500">${p.part_name}</div><div class="pn">Job ${p.job_id} \u00b7 ${p.part_id} \u00b7 qty ${p.assigned_qty}</div><div class="pa">Staged by ${p.staged_by} \u00b7 ${p.staged_at}</div></div><span class="ps s-staged">staged</span></div>`);
+    html+=sec('Signed out ('+signedOut.length+')',signedOut,p=>`<div class="prow"><div class="pi"><div style="font-size:13px;font-weight:500">${p.part_name}</div><div class="pn">Job ${p.job_id} \u00b7 taken ${p.taken_qty||1}</div><div class="pa">Out: ${p.signed_out_by||'--'} \u00b7 ${p.signed_out_at||'--'}</div></div><span class="ps s-out">out</span></div>`);
+    if(installed.length)html+=sec('Installed ('+installed.length+')',installed,p=>`<div class="prow"><div class="pi"><div style="font-size:13px;font-weight:500">${p.part_name}</div><div class="pn">Job ${p.job_id} \u00b7 installed ${p.installed_qty}</div><div class="pa">By ${p.installed_by||'--'} \u00b7 ${p.installed_at||'--'}</div></div><span class="ps s-inst">installed</span></div>`);
+    el.innerHTML=html;
+  }catch(e){el.innerHTML='<div class="empty">Error: '+e.message+'</div>';}
+}
+async function exportRptCSV(type){
+  try{
+    const data=await api('GET','/report');const now=new Date().toLocaleDateString('en-US');let rows,fn;
+    if(type==='staged'){rows=[['Job','Part ID','Part Name','Qty','Staged By','Staged At']];data.staged.forEach(p=>rows.push([p.job_id,p.part_id,p.part_name,p.assigned_qty,p.staged_by,p.staged_at]));fn='staged_'+now.replace(/\//g,'-')+'.csv';}
+    else if(type==='signedout'){rows=[['Job','Part ID','Part Name','Taken Qty','Overage','Staged By','Out By','Out At']];[...data.signedOut,...data.overages].forEach(p=>rows.push([p.job_id,p.part_id,p.part_name,p.taken_qty||1,p.over?'YES':'',p.staged_by,p.signed_out_by||'',p.signed_out_at||'']));fn='signedout_'+now.replace(/\//g,'-')+'.csv';}
+    else{rows=[['Date','Job','Part ID','Part Name','Status','Assigned','Taken','Installed','Staged By','Staged At','Out By','Out At','Installed By','Installed At']];[...data.staged,...data.signedOut,...data.installed,...data.overages].forEach(p=>rows.push([now,p.job_id,p.part_id,p.part_name,p.status,p.assigned_qty,p.taken_qty||0,p.installed_qty||0,p.staged_by||'',p.staged_at||'',p.signed_out_by||'',p.signed_out_at||'',p.installed_by||'',p.installed_at||'']));fn='full_report_'+now.replace(/\//g,'-')+'.csv';}
+    dlCSV(fmtCSV(rows),fn);toast('Exported');
+  }catch(e){toast('Error: '+e.message);}
+}
+
+// AUDIT LOG
+async function loadLog(){try{logData=await api('GET','/log');renderLog();}catch(e){document.getElementById('log-list').innerHTML='<div class="empty">Access denied</div>';}}
+function renderLog(){
+  const q=(document.getElementById('log-filter')?.value||'').toLowerCase();const el=document.getElementById('log-list');
+  const items=logData.filter(l=>!q||(l.job_id+l.part_name+l.username+l.part_id).toLowerCase().includes(q));
+  if(!items.length){el.innerHTML='<div class="empty">No activity</div>';return;}
+  el.innerHTML=items.map(l=>`<div class="prow"><div class="pi"><div class="pid">${l.username}<span class="badge ${l.type==='staged'?'b-staged':l.type==='over'?'b-over':'b-out'}">${l.type}</span></div><div class="pn">${l.part_name||''} \u00b7 job ${l.job_id||''}${l.extra?' \u00b7 '+l.extra:''}</div><div class="pa">${fmtDate(l.created_at)}</div></div></div>`).join('');
+}
+function exportLogCSV(){const rows=[['Timestamp','User','Action','Part Name','Part ID','Job ID','Notes']];logData.forEach(l=>rows.push([l.created_at,l.username,l.type,l.part_name||'',l.part_id||'',l.job_id||'',l.extra||'']));dlCSV(fmtCSV(rows),'audit_log.csv');toast('Exported');}
+
+// ADMIN
+async function loadUsers(){
+  if(CU?.role!=='admin'){hideEl('admin-wrap');showEl('admin-lock');return;}
+  try{const users=await api('GET','/users');renderUsers(users);}catch(e){toast(e.message);}
+}
+function renderUsers(users){
+  document.getElementById('users-list').innerHTML=users.map(u=>`<div class="card" style="margin-bottom:8px"><div style="font-size:15px;font-weight:600">${u.name} ${u.id===CU?.id?'<span style="font-size:11px;color:var(--text3)">(you)</span>':''}<span class="role-badge role-${u.role}">${u.role}</span>${!u.active?'<span class="badge" style="background:var(--red-bg);color:var(--red-t)">disabled</span>':''}</div><div class="pn">@${u.username} \u00b7 ${fmtDate(u.created_at)}</div><div class="row" style="margin-top:8px"><button class="btn btn-sm" onclick="openEditUser('${u.id}','${u.name.replace(/'/g,"\\'")}','${u.role}',${u.active})">Edit</button>${u.id!==CU?.id?'<button class="btn btn-sm btn-d" onclick="delUser(\''+u.id+'\',\''+u.name.replace(/'/g,"\\'")+'\')" >Delete</button>':''}</div></div>`).join('');
+}
+async function createUser(){
+  const name=document.getElementById('a-name').value.trim(),username=document.getElementById('a-user').value.trim(),password=document.getElementById('a-pass').value,role=document.getElementById('a-role').value;
+  if(!name||!username||!password){toast('All fields required');return;}if(password.length<6){toast('Password min 6 chars');return;}
+  try{await api('POST','/users',{name,username,password,role});['a-name','a-user','a-pass'].forEach(id=>document.getElementById(id).value='');loadUsers();toast('User created');}catch(e){toast('Error: '+e.message);}
+}
+function openEditUser(id,name,role,active){document.getElementById('eu-id').value=id;document.getElementById('eu-name').value=name;document.getElementById('eu-role').value=role;document.getElementById('eu-active').value=active?'1':'0';document.getElementById('eu-pass').value='';showEl('eu-modal');}
+async function saveEditUser(){
+  const id=document.getElementById('eu-id').value;const body={name:document.getElementById('eu-name').value.trim(),role:document.getElementById('eu-role').value,active:document.getElementById('eu-active').value==='1'};
+  const pass=document.getElementById('eu-pass').value;if(pass){if(pass.length<6){toast('Password min 6 chars');return;}body.password=pass;}
+  try{await api('PUT','/users/'+id,body);hideEl('eu-modal');loadUsers();toast('Saved');}catch(e){toast(e.message);}
+}
+async function delUser(id,name){if(!confirm('Delete '+name+'?'))return;try{await api('DELETE','/users/'+id);loadUsers();toast('Deleted');}catch(e){toast(e.message);}}
+
+renderOrdParts();
+init();
+</script>
+<script>
+const _m={name:'Field Ops',short_name:'Field Ops',start_url:'/',display:'standalone',background_color:'#ffffff',theme_color:'#ffffff'};
+const _b=new Blob([JSON.stringify(_m)],{type:'application/json'});
+const _l=document.createElement('link');_l.rel='manifest';_l.href=URL.createObjectURL(_b);document.head.appendChild(_l);
+</script>
+</body>
+</html>

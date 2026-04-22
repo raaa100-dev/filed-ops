@@ -600,6 +600,304 @@ let peLegendData=[];
 
 const PE_COLORS=['#E24B4A','#185fa5','#27500a','#f5b800','#9b59b6','#1d1d1f'];
 
+async function api(method,path,body){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(token)opts.headers['Authorization']='Bearer '+token;
+  if(body)opts.body=JSON.stringify(body);
+  try{const r=await fetch(API+path,opts);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Server error '+r.status);return d;}
+  catch(e){if(e.message.includes('Failed to fetch'))throw new Error('Cannot reach server');throw e;}
+}
+function toast(m,d=2500){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),d);}
+function showEl(id){const e=document.getElementById(id);if(e)e.style.display='';}
+function hideEl(id){const e=document.getElementById(id);if(e)e.style.display='none';}
+function fmtCSV(rows){return rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');}
+function dlCSV(csv,fn){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=fn;a.click();}
+function fmtDate(d){if(!d)return '--';try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return d;}}
+function fmtDateTime(d){if(!d)return '--';try{return new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});}catch(e){return d;}}
+function daysUntil(d){if(!d)return null;const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(d)-t)/864e5);}
+
+async function init(){
+  hideEl('app');showEl('login-screen');
+  if(token){try{CU=await api('GET','/me');showApp();return;}catch(e){token=null;localStorage.removeItem('wh_token');document.getElementById('server-status').textContent='Session expired';}}
+}
+async function doLogin(){
+  const u=document.getElementById('l-user').value.trim(),p=document.getElementById('l-pass').value;
+  const btn=document.getElementById('login-btn'),err=document.getElementById('login-err');
+  if(!u||!p){err.textContent='Enter username and password';err.style.display='block';return;}
+  btn.disabled=true;btn.textContent='Signing in...';err.style.display='none';
+  try{const d=await api('POST','/login',{username:u,password:p});token=d.token;CU=d.user;localStorage.setItem('wh_token',token);showApp();}
+  catch(e){err.textContent=e.message;err.style.display='block';btn.disabled=false;btn.textContent='Sign In';}
+}
+function doLogout(){if(confirm('Sign out?')){token=null;CU=null;localStorage.removeItem('wh_token');location.reload();}}
+function roleLabel(r){return{admin:'Administrator',stager:'Stager',signout:'Sign-out',requestor:'Requestor',technician:'Technician',foreman:'Foreman'}[r]||r;}
+
+function showApp(){
+  hideEl('login-screen');document.getElementById('app').style.display='flex';
+  document.getElementById('user-pill').textContent=CU.name;
+  document.getElementById('hdr-sub').textContent=roleLabel(CU.role);
+  if(CU.role==='admin'){showEl('nav-log');showEl('nav-admin');}
+  const canEdit=['admin','stager','foreman'].includes(CU.role);
+  if(!canEdit){hideEl('job-create-section');hideEl('cat-edit-section');}
+  if(CU.role==='requestor'||CU.role==='signout')hideEl('scan-main');
+  if(CU.role==='requestor')showEl('perm-req-lock');
+  if(CU.role==='signout')document.getElementById('mode-stage').disabled=true;
+  loadAll();show('dash');
+}
+async function loadAll(){
+  await Promise.all([loadCatalog(),loadJobs(),loadNotifs(),loadInv()]);
+  await loadSchedule();renderDash();renderRecent();
+}
+function show(n){
+  stopAllCams();
+  document.querySelectorAll('.sc').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b=>{b.classList.toggle('active',(b.getAttribute('onclick')||'').includes("'"+n+"'"));});
+  const sc=document.getElementById('sc-'+n);if(sc)sc.classList.add('active');
+  if(n==='jobs')renderJobs();if(n==='catalog')renderCat();if(n==='report')renderReport();
+  if(n==='log')loadLog();if(n==='admin')loadUsers();if(n==='inv')renderInv();
+  if(n==='notif'){loadNotifs();renderNotifs();}if(n==='orders'){loadOrders();renderOrders();}
+  if(n==='schedule')loadSchedule();if(n==='dash')renderDash();
+  if(n==='hours')loadHours();if(n==='financials')loadFinancials();
+}
+
+// CATALOG
+async function loadCatalog(){try{const d=await api('GET','/catalog');catalog={};d.forEach(c=>{catalog[c.barcode]=c;(c.alt_barcodes||[]).forEach(ab=>{if(ab&&ab.trim())catalog[ab.trim()]=c;});});}catch(e){}}
+function lookup(bc){return bc?catalog[bc.trim()]||null:null;}
+function resolveCatBC(val){const el=document.getElementById('cat-bc-res');if(!el)return;const v=(val||'').trim();if(!v){el.style.display='none';return;}const p=lookup(v);el.style.display='block';el.innerHTML=p?'<div class="bb bb-ok"><div class="bn">'+p.name+'</div><div class="bm">Already in catalog</div></div>':'<div class="bb bb-warn"><div class="bm">New barcode</div></div>';}
+async function saveCat(){
+  const bc=document.getElementById('c-bc').value.trim(),nm=document.getElementById('c-nm').value.trim();
+  if(!bc||!nm){toast('Barcode and name required');return;}
+  const alts=document.getElementById('c-alt').value.trim().split(',').map(a=>a.trim()).filter(Boolean);
+  const cost=parseFloat(document.getElementById('c-cost')?.value.trim())||0;
+  try{await api('POST','/catalog',{barcode:bc,name:nm,part_number:document.getElementById('c-pn').value.trim(),category:document.getElementById('c-cat').value.trim(),description:document.getElementById('c-desc').value.trim(),alt_barcodes:alts,unit_cost:cost});['c-bc','c-alt','c-pn','c-nm','c-cat','c-desc','c-cost'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});hideEl('cat-bc-res');await loadCatalog();renderCat();toast('Saved: '+nm);}
+  catch(e){toast('Error: '+e.message);}
+}
+function renderCat(){
+  const q=(document.getElementById('c-search')?.value||'').toLowerCase();
+  const unique=Object.values(catalog).filter((c,i,a)=>a.findIndex(x=>x.barcode===c.barcode)===i);
+  const items=unique.filter(c=>(c.name+c.barcode+(c.part_number||'')+(c.category||'')).toLowerCase().includes(q));
+  const el=document.getElementById('c-list');if(!el)return;
+  if(!items.length){el.innerHTML='<div class="empty">No parts in catalog</div>';return;}
+  el.innerHTML=items.map(c=>`<div class="prow"><div class="pi"><div class="pid">${c.name}</div><div class="pn">${[c.part_number,c.barcode,c.category].filter(Boolean).join(' \u00b7 ')}${c.unit_cost>0?' \u00b7 $'+Number(c.unit_cost).toFixed(2):''}</div>${c.alt_barcodes?.length?'<div class="pa">Alt: '+c.alt_barcodes.join(', ')+'</div>':''}${c.description?'<div class="pa">'+c.description+'</div>':''}</div>${CU?.role==='admin'?'<button class="ib" style="color:var(--red-t)" onclick="delCat(\''+c.barcode+'\')">&#215;</button>':''}</div>`).join('');
+}
+async function delCat(bc){if(!confirm('Remove?'))return;try{await api('DELETE','/catalog/'+encodeURIComponent(bc));await loadCatalog();renderCat();toast('Removed');}catch(e){toast(e.message);}}
+function exportCatCSV(){const u=Object.values(catalog).filter((c,i,a)=>a.findIndex(x=>x.barcode===c.barcode)===i);const rows=[['barcode','alt_barcodes','part_number','name','category','description','unit_cost']];u.forEach(c=>rows.push([c.barcode,(c.alt_barcodes||[]).join(','),c.part_number||'',c.name,c.category||'',c.description||'',c.unit_cost||0]));dlCSV(fmtCSV(rows),'catalog.csv');toast('Exported');}
+function importCatCSV(input){
+  const file=input.files[0];if(!file)return;
+  const r=new FileReader();r.onload=async e=>{
+    const lines=e.target.result.split('\n').filter(l=>l.trim());let hdr=null,count=0;
+    for(const line of lines){const cols=line.match(/("(?:[^"]|"")*"|[^,]*)/g).map(v=>v.replace(/^"|"$/g,'').replace(/""/g,'"'));if(!hdr){hdr=cols.map(h=>h.trim().toLowerCase());continue;}const idx=f=>hdr.indexOf(f);const bc=cols[idx('barcode')]?.trim(),nm=cols[idx('name')]?.trim();if(!bc||!nm)continue;const alts=cols[idx('alt_barcodes')]?.trim().split(',').map(a=>a.trim()).filter(Boolean)||[];try{await api('POST','/catalog',{barcode:bc,name:nm,part_number:cols[idx('part_number')]?.trim()||'',category:cols[idx('category')]?.trim()||'',description:cols[idx('description')]?.trim()||'',alt_barcodes:alts,unit_cost:parseFloat(cols[idx('unit_cost')])||0});count++;}catch(ex){}}
+    await loadCatalog();renderCat();toast('Imported '+count);input.value='';
+  };r.readAsText(file);
+}
+
+// RESOLVE HELPERS
+function resolveBC(val,elId){const el=document.getElementById(elId);if(!el)return;const v=(val||'').trim();if(!v){el.style.display='none';return;}const p=lookup(v);el.style.display='block';el.innerHTML=p?'<div class="bb bb-ok"><div class="bn">'+p.name+(p.part_number?' \u00b7 '+p.part_number:'')+'</div><div class="bm">'+(p.category||p.description||v)+'</div></div>':'<div class="bb bb-warn"><div class="bm">Unknown barcode</div></div>';}
+function resolveInvBC(val){const el=document.getElementById('inv-bc-res');if(!el)return;const v=(val||'').trim();if(!v){el.style.display='none';return;}const p=lookup(v);el.style.display='block';if(p){el.innerHTML='<div class="bb bb-ok"><div class="bn">'+p.name+'</div><div class="bm">Found in catalog</div></div>';document.getElementById('i-nm').value=p.name;document.getElementById('i-desc').value=p.description||'';}else{el.innerHTML='<div class="bb bb-warn"><div class="bm">Unknown barcode</div></div>';document.getElementById('i-nm').value='';}}
+
+// BEEP
+function playBeep(){try{const ctx=new(window.AudioContext||window.webkitAudioContext)();[[880,0],[1100,.1]].forEach(([f,d])=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type='sine';o.frequency.value=f;const t=ctx.currentTime+d;g.gain.setValueAtTime(.4,t);g.gain.exponentialRampToValueAtTime(.001,t+.15);o.start(t);o.stop(t+.15);});setTimeout(()=>ctx.close(),600);}catch(e){}}
+
+// CAMERAS
+function stopAllCams(){Object.keys(camActive).forEach(k=>{if(camActive[k])stopCam(k);});}
+function toggleCam(key){camActive[key]?stopCam(key):startCam(key);}
+function camEls(key){const m={main:{wrap:'cam-wrap-main',prev:'cam-prev-main',btn:'cam-btn-main',status:'cam-status-main',det:'cam-det-main',detTxt:'cam-det-text-main'},cat:{wrap:'cat-cam-wrap',prev:'cam-prev-cat',btn:'cat-cam-btn',status:'cam-status-cat',det:'cam-det-cat',detTxt:'cam-det-text-cat'},inv:{wrap:'inv-cam-wrap',prev:'cam-prev-inv',btn:'inv-cam-btn',status:'cam-status-inv',det:'cam-det-inv',detTxt:'cam-det-text-inv'}};return m[key]||m.main;}
+function startCam(key){
+  const e=camEls(key);let wrap=document.getElementById(e.wrap);
+  if(!wrap){wrap=document.createElement('div');wrap.id=e.wrap;wrap.style.marginBottom='8px';wrap.innerHTML='<div class="cam-wrap"><div id="'+e.prev+'"></div><div class="cam-overlay"><div class="scan-rect"><div class="scan-line"></div></div></div><div class="cam-status" id="'+e.status+'">Align barcode</div><div class="cam-det" id="'+e.det+'" style="display:none"><span id="'+e.detTxt+'"></span></div></div>';const btn=document.getElementById(e.btn);if(btn)btn.parentElement.insertAdjacentElement('afterend',wrap);}
+  else wrap.style.display='block';
+  const btn=document.getElementById(e.btn);if(btn)btn.textContent='\u23f9 Stop';
+  Quagga.init({inputStream:{type:'LiveStream',target:document.getElementById(e.prev),constraints:{facingMode:'environment'}},decoder:{readers:['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader','upc_e_reader','codabar_reader','i2of5_reader']},locate:true,numOfWorkers:2,frequency:10},err=>{
+    if(err){toast('Camera not available');stopCam(key);return;}
+    Quagga.start();camActive[key]=true;
+    const st=document.getElementById(e.status);if(st)st.textContent='Align barcode in frame';
+    if(key==='main'){const tr=Quagga.CameraAccess.getActiveTrack();if(tr?.getCapabilities?.().torch){torchTrack=tr;showEl('torch-btn');}}
+  });
+  Quagga.offDetected();
+  Quagga.onDetected(result=>{
+    const code=result.codeResult.code;if(!code||scanCD)return;
+    scanCD=true;try{Quagga.stop();}catch(ex){}camActive[key]=false;
+    playBeep();if(navigator.vibrate)navigator.vibrate([60,40,60]);
+    const det=document.getElementById(e.det),detTxt=document.getElementById(e.detTxt);
+    if(det&&detTxt){detTxt.textContent='\u2713 '+code;det.style.display='block';setTimeout(()=>det.style.display='none',800);}
+    const btn2=document.getElementById(e.btn);if(btn2)btn2.textContent=key==='main'?'\u{1F4F7} Camera':'\u{1F4F7}';
+    const w=document.getElementById(e.wrap);if(w)w.style.display='none';
+    if(key==='main'){torchTrack=null;torchOn=false;hideEl('torch-btn');}
+    scanCD=false;handleScan(key,code);
+  });
+}
+function stopCam(key){if(!camActive[key])return;try{Quagga.stop();}catch(e){}camActive[key]=false;const e=camEls(key);const w=document.getElementById(e.wrap);if(w)w.style.display='none';const btn=document.getElementById(e.btn);if(btn)btn.textContent=key==='main'?'\u{1F4F7} Camera':'\u{1F4F7}';if(key==='main'){torchTrack=null;torchOn=false;hideEl('torch-btn');}}
+function toggleTorch(){if(!torchTrack)return;torchOn=!torchOn;torchTrack.applyConstraints({advanced:[{torch:torchOn}]});document.getElementById('torch-btn').textContent=torchOn?'\u{1F526} ON':'\u{1F526} Torch';}
+function handleScan(key,code){
+  const part=lookup(code);const canon=part?part.barcode:code;
+  if(key==='main'){document.getElementById('s-part').value=canon;resolveBC(canon,'s-resolve');addToCartCode(canon);document.getElementById('s-part').value='';hideEl('s-resolve');showScanModal(canon);}
+  else if(key==='cat'){document.getElementById('c-bc').value=canon;resolveCatBC(canon);if(part){document.getElementById('c-pn').value=part.part_number||'';document.getElementById('c-nm').value=part.name||'';document.getElementById('c-cat').value=part.category||'';document.getElementById('c-desc').value=part.description||'';if(part.alt_barcodes?.length)document.getElementById('c-alt').value=part.alt_barcodes.join(', ');toast('Found -- edit to update');}else{setTimeout(()=>document.getElementById('c-nm').focus(),100);toast('New barcode');}}
+  else if(key==='inv'){document.getElementById('i-bc').value=canon;resolveInvBC(canon);if(part){setTimeout(()=>document.getElementById('i-qty').focus(),100);}else{setTimeout(()=>document.getElementById('i-nm').focus(),100);}}
+}
+
+// SCAN MODAL
+function showScanModal(code){const item=cart.items[code];const p=lookup(code);const nm=item?.name||p?.name||code;const total=Object.values(cart.items).reduce((a,i)=>a+i.qty,0);document.getElementById('sm-part-name').textContent=nm+(item?.qty>1?' \xd7 '+item.qty:'');document.getElementById('sm-sub').innerHTML='In cart \u00b7 <strong>'+total+'</strong> total';showEl('scan-modal');}
+function scanAnother(){hideEl('scan-modal');startCam('main');}
+function scanDone(){hideEl('scan-modal');document.getElementById('cart-box')?.scrollIntoView({behavior:'smooth',block:'center'});}
+
+// CART
+function setMode(m){if(CU?.role==='signout'&&m==='stage'){toast('Not permitted');return;}cart.mode=m;cart.items={};document.getElementById('mode-stage').classList.toggle('active',m==='stage');document.getElementById('mode-out').classList.toggle('active',m==='out');document.getElementById('cart-lbl').textContent=m==='stage'?'Staging cart':'Sign-out cart';document.getElementById('cart-commit-btn').textContent=m==='stage'?'Stage all to job':'Sign out all from job';renderCart();}
+function addToCart(){const c=document.getElementById('s-part').value.trim();if(c)addToCartCode(c);}
+function addToCartCode(code){const p=lookup(code);const canon=p?p.barcode:code;const nm=p?p.name:code;if(cart.items[canon])cart.items[canon].qty++;else cart.items[canon]={id:canon,name:nm,qty:1};renderCart();}
+function cartAdj(id,d){if(!cart.items[id])return;cart.items[id].qty=Math.max(1,cart.items[id].qty+d);renderCart();}
+function cartRm(id){delete cart.items[id];renderCart();}
+function clearCart(){cart.items={};renderCart();}
+function renderCart(){
+  const items=Object.values(cart.items);const box=document.getElementById('cart-box');
+  document.getElementById('cart-cnt').textContent=items.reduce((a,i)=>a+i.qty,0);
+  if(!items.length){box.style.display='none';return;}box.style.display='block';
+  document.getElementById('cart-items').innerHTML=items.map(i=>`<div class="cart-item"><div class="ci"><div class="cn">${i.name!==i.id?i.name:i.id}</div><div class="cb">${i.id}</div></div><div class="qty-c"><button onclick="cartAdj('${i.id}',-1)">-</button><span>${i.qty}</span><button onclick="cartAdj('${i.id}',1)">+</button></div><button class="ib" style="color:var(--red-t)" onclick="cartRm('${i.id}')">&#215;</button></div>`).join('');
+}
+async function commitCart(){
+  const jobId=document.getElementById('s-job').value.trim();if(!jobId){toast('Enter a job ID');return;}
+  const items=Object.values(cart.items);if(!items.length){toast('Cart is empty');return;}
+  if(!jobs[jobId]){try{const j=await api('GET','/jobs/'+jobId);jobs[j.id]=j;}catch(e){toast('Job not found -- create it in Jobs first');return;}}
+  let ok=0,errs=[];
+  for(const item of items){
+    try{
+      if(cart.mode==='stage'){await api('POST','/jobs/'+jobId+'/parts',{partId:item.id,part_name:item.name,assignedQty:item.qty});}
+      else{const jparts=await api('GET','/jobs/'+jobId+'/parts');const found=jparts.find(p=>p.part_id===item.id&&p.status==='staged');if(!found){errs.push(item.name+': not staged');continue;}await api('POST','/jobs/'+jobId+'/parts/'+found.id+'/signout',{qty:item.qty});}
+      ok++;
+    }catch(e){errs.push(item.name+': '+e.message);}
+  }
+  addRecent(cart.mode,jobId,items);renderRecent();cart.items={};renderCart();await loadJobs();
+  if(errs.length)toast(ok+' done \u2013 '+errs[0],4000);else toast((cart.mode==='stage'?'Staged ':'Signed out ')+ok);
+}
+function addRecent(type,jobId,items){recent.unshift({type,jobId,items:[...items],user:CU?.name,time:new Date().toLocaleTimeString()});if(recent.length>20)recent=recent.slice(0,20);localStorage.setItem('wh_recent',JSON.stringify(recent));}
+function renderRecent(){const el=document.getElementById('s-recent');if(!el)return;if(!recent.length){el.innerHTML='<div class="empty">No activity yet</div>';return;}el.innerHTML=recent.map(r=>{const total=r.items.reduce((a,i)=>a+i.qty,0);const names=r.items.map(i=>i.name!==i.id?i.name:i.id).slice(0,3).join(', ')+(r.items.length>3?' +more':'');return`<div class="prow"><div class="pi"><div class="pid">${r.type==='stage'?'Staged':'Signed out'}: ${r.items.length} type${r.items.length!==1?'s':''}, ${total} total<span class="badge ${r.type==='stage'?'b-staged':'b-out'}">${r.type}</span></div><div class="pn">Job ${r.jobId} \u00b7 ${names}</div><div class="pa">${r.user||''} \u00b7 ${r.time}</div></div></div>`;}).join('');}
+
+// JOBS
+async function loadJobs(){try{const d=await api('GET','/jobs');jobs={};d.forEach(j=>jobs[j.id]=j);}catch(e){}}
+async function createJob(){
+  const id=document.getElementById('cj-id').value.trim();if(!id){toast('Job ID required');return;}
+  try{const j=await api('POST','/jobs',{id,name:document.getElementById('cj-name').value.trim(),address:document.getElementById('cj-addr').value.trim(),gc_company:document.getElementById('cj-gcc').value.trim(),gc_contact:document.getElementById('cj-gcn').value.trim(),gc_phone:document.getElementById('cj-gcp').value.trim(),gc_email:document.getElementById('cj-gce').value.trim(),super_name:document.getElementById('cj-supn').value.trim(),super_phone:document.getElementById('cj-supp').value.trim()});hideEl('create-job-modal');['cj-id','cj-name','cj-addr','cj-gcc','cj-gcn','cj-gcp','cj-gce','cj-supn','cj-supp'].forEach(id2=>document.getElementById(id2).value='');jobs[j.id]=j;renderJobs();toast('Job created: '+j.id);showJob(j.id);}
+  catch(e){toast('Error: '+e.message);}
+}
+function downloadJobTemplate(){
+  const cols=['id','name','address','gc_company','gc_contact','gc_phone','gc_email','super_name','super_phone','super_email','scope','notes','install_notes','job_walk_by','job_walk_date','job_walk_notes','date_contract','date_permit','date_start','date_roughin','date_trimout','date_inspection','date_next_visit','date_closeout','date_co'];
+  const example=['JOB-2026-001','Main St Office','123 Main St','ABC General','John Smith','555-555-5555','john@abc.com','Mike Jones','555-555-5556','mike@abc.com','Electrical rough-in and trim','Notes here','Install notes here','Jane Doe','2026-04-01','Job walk notes here','2026-03-15','2026-04-01','2026-05-01','2026-06-01','2026-07-01','2026-07-15','2026-05-15','2026-08-01','2026-08-15'];
+  dlCSV(fmtCSV([cols,example]),'jobs_template.csv');toast('Template downloaded');
+}
+function importJobsCSV(input){
+  const file=input.files[0];if(!file)return;
+  const r=new FileReader();r.onload=async e=>{
+    const lines=e.target.result.split('\n').filter(l=>l.trim());let hdr=null;const jobList=[];
+    for(const line of lines){const cols=line.match(/("(?:[^"]|"")*"|[^,]*)/g).map(v=>v.replace(/^"|"$/g,'').replace(/""/g,'"'));if(!hdr){hdr=cols.map(h=>h.trim().toLowerCase());continue;}const obj={};hdr.forEach((h,i)=>obj[h]=cols[i]?.trim()||'');if(obj.id)jobList.push(obj);}
+    if(!jobList.length){toast('No valid rows found');input.value='';return;}
+    try{const result=await api('POST','/jobs/import',{jobs:jobList});await loadJobs();renderJobs();toast('Created: '+result.created.length+(result.skipped.length?' | Skipped: '+result.skipped.length:''));}
+    catch(e){toast('Error: '+e.message);}
+    input.value='';
+  };r.readAsText(file);
+}
+
+// INVENTORY
+async function loadInv(){try{const d=await api('GET','/inventory');invData={};d.forEach(i=>invData[i.id]=i);}catch(e){}}
+async function addInv(){const bc=document.getElementById('i-bc').value.trim();const nm=document.getElementById('i-nm').value.trim();const desc=document.getElementById('i-desc').value.trim();const minQ=parseInt(document.getElementById('i-min').value.trim())||0;const qty=parseInt(document.getElementById('i-qty').value.trim())||1;if(!bc){toast('Scan or enter barcode');return;}const nm2=nm||lookup(bc)?.name||bc;try{await api('POST','/inventory',{id:bc,name:nm2,description:desc,qty,min_qty:minQ});if(nm&&!lookup(bc)){try{await api('POST','/catalog',{barcode:bc,name:nm,description:desc,part_number:'',category:'',alt_barcodes:[]});await loadCatalog();}catch(ex){}}['i-bc','i-nm','i-desc','i-min','i-qty'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});hideEl('inv-bc-res');await loadInv();renderInv();toast('Added '+qty+'x '+nm2);}catch(e){toast('Error: '+e.message);}}
+function renderInv(){const q=(document.getElementById('inv-search')?.value||'').toLowerCase();const el=document.getElementById('i-list');if(!el)return;const items=Object.values(invData).filter(i=>!q||(i.name+i.id+(i.description||'')).toLowerCase().includes(q)).sort((a,b)=>a.name>b.name?1:-1);if(!items.length){el.innerHTML='<div class="empty">No stock entered</div>';return;}el.innerHTML=items.map(i=>{const low=i.min_qty>0&&i.qty<=i.min_qty;return`<div class="prow"><div class="pi"><div class="pid">${i.name!==i.id?i.name:i.id}${low?'<span class="badge b-over">low</span>':''}</div><div class="pn">${i.name!==i.id?i.id:''}</div>${i.description?'<div class="pa">'+i.description+'</div>':''}</div><div style="font-size:20px;font-weight:700;min-width:28px;text-align:right;color:${low?'var(--red-t)':'var(--text)'}">${i.qty}</div><div style="display:flex;gap:5px"><button class="ib" onclick="adjInv('${i.id}',1)">+</button><button class="ib" onclick="adjInv('${i.id}',-1)">-</button></div></div>`;}).join('');}
+async function adjInv(id,d){const item=invData[id];if(!item)return;try{await api('PUT','/inventory/'+encodeURIComponent(id),{qty:Math.max(0,item.qty+d)});await loadInv();renderInv();}catch(e){toast(e.message);}}
+
+// SCHEDULE
+async function loadSchedule(){try{schedData=await api('GET','/schedule');}catch(e){schedData=[];}renderSchedList();}
+function schedView(v){if(v==='list'){showEl('sched-list-view');hideEl('sched-cal-view');document.getElementById('sched-list-btn').className='btn btn-sm btn-p';document.getElementById('sched-cal-btn').className='btn btn-sm';}else{hideEl('sched-list-view');showEl('sched-cal-view');document.getElementById('sched-list-btn').className='btn btn-sm';document.getElementById('sched-cal-btn').className='btn btn-sm btn-p';renderCalendar();}}
+function renderSchedList(){
+  const el=document.getElementById('sched-list-view');if(!el)return;
+  if(!schedData.length){el.innerHTML='<div class="empty">No dates scheduled yet<br><br>Add dates to jobs via Jobs \u2192 Schedule tab</div>';return;}
+  const overdue=schedData.filter(s=>s.days_away<0);const urgent=schedData.filter(s=>s.days_away>=0&&s.days_away<=14);const upcoming=schedData.filter(s=>s.days_away>14);
+  let html='';
+  if(overdue.length)html+=`<div style="font-size:12px;font-weight:600;color:var(--red-t);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Overdue (${overdue.length})</div>`+overdue.map(s=>schedItem(s,'sched-urgent')).join('');
+  if(urgent.length)html+=`<div style="font-size:12px;font-weight:600;color:var(--amber-t);margin:12px 0 8px;text-transform:uppercase;letter-spacing:.04em">Next 14 days (${urgent.length})</div>`+urgent.map(s=>schedItem(s,'sched-soon')).join('');
+  if(upcoming.length)html+=`<div style="font-size:12px;font-weight:600;color:var(--text2);margin:12px 0 8px;text-transform:uppercase;letter-spacing:.04em">Upcoming</div>`+upcoming.map(s=>schedItem(s,'')).join('');
+  el.innerHTML=html;
+}
+function schedItem(s,cls){const d=new Date(s.date);return`<div class="sched-item ${cls}" onclick="showJob('${s.job_id}')"><div class="sched-date-box"><div class="sd">${d.getDate()}</div><div class="sm">${d.toLocaleDateString('en-US',{month:'short'})}</div></div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${s.job_id} \u00b7 ${s.date_type}</div><div class="pn">${s.job_name}</div>${s.address?'<div class="pa">'+s.address+'</div>':''}<div class="pa" style="color:${s.days_away<0?'var(--red-t)':s.days_away<=14?'var(--amber-t)':'var(--text3)'}">${s.days_away<0?Math.abs(s.days_away)+'d overdue':s.days_away===0?'TODAY':s.days_away+'d away'}</div></div></div>`;}
+function renderCalendar(){const el=document.getElementById('sched-cal-view');if(!el)return;const today=new Date();const year=today.getFullYear();const month=today.getMonth();const firstDay=new Date(year,month,1).getDay();const daysInMonth=new Date(year,month+1,0).getDate();const evts={};schedData.forEach(s=>{const d=new Date(s.date);if(d.getFullYear()===year&&d.getMonth()===month){const k=d.getDate();if(!evts[k])evts[k]=[];evts[k].push(s);}});let html=`<div style="font-size:15px;font-weight:600;text-align:center;margin-bottom:10px">${today.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div><div class="cal-hdr">${['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<span>${d}</span>`).join('')}</div><div class="calendar-grid">`;for(let i=0;i<firstDay;i++)html+='<div></div>';for(let d=1;d<=daysInMonth;d++){const isToday=d===today.getDate();const dots=(evts[d]||[]).slice(0,3).map(()=>'<div class="cal-dot"></div>').join('');html+=`<div class="cal-day ${isToday?'today':''}" onclick="showCalDay(${year},${month+1},${d})"><div class="cal-num">${d}</div>${dots}</div>`;}html+='</div>';el.innerHTML=html;}
+function showCalDay(y,m,d){const evts=schedData.filter(s=>{const sd=new Date(s.date);return sd.getFullYear()===y&&sd.getMonth()===m-1&&sd.getDate()===d;});if(!evts.length){toast('No events this day');return;}alert(evts.map(e=>e.job_id+': '+e.date_type+'\n'+(e.job_name||'')).join('\n\n'));}
+
+// DASHBOARD
+async function renderDash(){
+  const overdue=schedData.filter(s=>s.days_away<0);const urgent14=schedData.filter(s=>s.days_away>=0&&s.days_away<=14);
+  let alertHtml='';
+  if(overdue.length||urgent14.length){alertHtml='<div style="background:var(--bg2);border-radius:var(--r);border:.5px solid var(--border2);padding:14px;margin-bottom:12px"><div style="font-size:15px;font-weight:700;margin-bottom:10px">&#128197; Schedule Alerts</div>';overdue.slice(0,3).forEach(s=>{alertHtml+=`<div class="alert-banner"><div class="at">OVERDUE: ${s.job_id} \u2014 ${s.date_type}</div><div class="am">${s.job_name} \u00b7 ${fmtDate(s.date)}</div></div>`;});urgent14.slice(0,5).forEach(s=>{alertHtml+=`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:.5px solid var(--border2)"><div style="font-size:22px;font-weight:700;color:var(--amber-t);min-width:30px">${s.days_away===0?'!':s.days_away}</div><div><div style="font-size:13px;font-weight:500">${s.job_id} \u00b7 ${s.date_type}</div><div class="pa">${s.job_name} \u00b7 ${fmtDate(s.date)}</div></div></div>`;});alertHtml+='</div>';}
+  document.getElementById('dash-alerts').innerHTML=alertHtml;
+  try{const r=await api('GET','/report');document.getElementById('ds-jobs').textContent=r.jobs;document.getElementById('ds-staged').textContent=r.staged?.length||0;document.getElementById('ds-out').textContent=r.signedOut?.length||0;document.getElementById('ds-inst').textContent=r.installed?.length||0;}catch(e){}
+  const recentJobs=Object.values(jobs).filter(j=>!j.archived).slice(0,6);
+  document.getElementById('dash-jobs').innerHTML=recentJobs.length?recentJobs.map(j=>`<div class="job-card" onclick="showJob('${j.id}')"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div><div style="font-size:15px;font-weight:700">${j.id}</div><div style="font-size:13px;color:var(--text2);margin-top:2px">${j.name||''}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${j.address||''}</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:12px;font-weight:500;color:${phaseColors[j.phase]||'var(--text3)'}">${phaseLabels[j.phase]||'--'}</div>${j.pct_complete>0?'<div style="font-size:11px;color:var(--text2)">'+j.pct_complete+'%</div>':''}</div></div>${j.date_next_visit?'<div class="pa" style="margin-top:5px">Next visit: '+fmtDate(j.date_next_visit)+'</div>':''}</div>`).join(''):'<div class="empty">No jobs yet</div>';
+}
+
+// NOTIFICATIONS
+async function loadNotifs(){try{notifData=await api('GET','/notifications');const unread=notifData.filter(n=>!n.read).length;const badge=document.getElementById('notif-badge');badge.textContent=unread>9?'9+':unread;badge.style.display=unread?'block':'none';}catch(e){}}
+function renderNotifs(){const el=document.getElementById('notif-list');if(!el)return;if(!notifData.length){el.innerHTML='<div class="empty">No notifications</div>';return;}const icons={low_stock:'\u26A0\uFE0F',new_order:'\u{1F4E6}',order_approved:'\u2705',order_staged:'\u{1F4E6}',order_rejected:'\u274C',overage:'\u26A0\uFE0F',gc_alert:'\u26A0\uFE0F',part_request:'\u{1F4E6}'};el.innerHTML=notifData.map(n=>`<div class="notif-item" onclick="markRead('${n.id}')"><div class="notif-dot${n.read?' read':''}"></div><div style="flex:1"><div style="font-size:13px;font-weight:600">${icons[n.type]||'\u{1F514}'} ${n.title}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${n.message}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${fmtDate(n.created_at)}</div></div></div>`).join('');}
+async function markRead(id){try{await api('POST','/notifications/'+id+'/read');await loadNotifs();}catch(e){}}
+async function markAllRead(){try{await api('POST','/notifications/read-all');await loadNotifs();renderNotifs();toast('All read');}catch(e){}}
+async function clearNotifs(){if(!confirm('Clear all?'))return;try{await api('DELETE','/notifications');notifData=[];renderNotifs();loadNotifs();toast('Cleared');}catch(e){toast(e.message);}}
+
+// ORDERS
+async function loadOrders(){try{ordersData=await api('GET','/orders');}catch(e){}}
+function addOrdPart(){const bc=document.getElementById('ord-bc').value.trim();const qty=parseInt(document.getElementById('ord-qty').value.trim())||1;if(!bc){toast('Enter barcode');return;}const p=lookup(bc);const nm=p?p.name:bc;const cid=p?p.barcode:bc;const ex=ordParts.find(x=>x.partId===cid);if(ex)ex.qty+=qty;else ordParts.push({partId:cid,name:nm,qty});document.getElementById('ord-bc').value='';document.getElementById('ord-qty').value='';hideEl('ord-res');renderOrdParts();toast('Added: '+nm);}
+function renderOrdParts(){const el=document.getElementById('ord-parts-list');if(!ordParts.length){el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0;margin-bottom:4px">No parts added yet</div>';return;}el.innerHTML='<div class="card" style="margin-bottom:8px">'+ordParts.map((p,i)=>`<div class="prow"><div class="pi"><div class="pid">${p.name!==p.partId?p.name:p.partId}</div><div class="pn">${p.partId} \u00b7 qty: ${p.qty}</div></div><button class="ib" style="color:var(--red-t)" onclick="ordParts.splice(${i},1);renderOrdParts()">&#215;</button></div>`).join('')+'</div>';}
+async function submitOrder(){const jobId=document.getElementById('ord-job').value.trim();const notes=document.getElementById('ord-notes').value.trim();if(!jobId){toast('Enter job ID');return;}if(!ordParts.length){toast('Add parts');return;}try{await api('POST','/orders',{job_id:jobId,notes,items:ordParts});ordParts=[];document.getElementById('ord-job').value='';document.getElementById('ord-notes').value='';renderOrdParts();await loadOrders();renderOrders();toast('Request submitted');}catch(e){toast('Error: '+e.message);}}
+function renderOrders(){
+  const el=document.getElementById('orders-list');if(!el)return;if(!ordersData.length){el.innerHTML='<div class="empty">No orders yet</div>';return;}
+  el.innerHTML=ordersData.map(o=>{const items=typeof o.items==='string'?JSON.parse(o.items):o.items||[];const sc={pending:'b-pending',approved:'b-inst',staged:'b-inst',rejected:'b-over'}[o.status]||'b-staged';const canAct=['admin','stager','foreman'].includes(CU?.role)&&o.status==='pending';const canStage=['admin','stager','foreman'].includes(CU?.role)&&(o.status==='pending'||o.status==='approved');return`<div class="card" style="margin-bottom:10px"><div style="font-size:14px;font-weight:600">Job ${o.job_id}<span class="badge ${sc}">${o.status}</span></div><div class="pa">${o.created_by} \u00b7 ${fmtDate(o.created_at)}</div><div style="font-size:13px;color:var(--text2);margin:6px 0;line-height:1.6">${items.map(i=>'&bull; '+i.name+(i.qty>1?' \xd7'+i.qty:'')).join('<br>')}</div>${o.notes?'<div style="font-size:12px;color:var(--text2)">'+o.notes+'</div>':''}${o.status==='rejected'&&o.rejection_note?'<div class="bb bb-err" style="margin-top:6px"><div class="bm">Rejected: '+o.rejection_note+'</div></div>':''}${canAct||canStage?'<div class="row" style="margin-top:10px">'+(canAct?'<button class="btn btn-sm btn-b" onclick="actOrder(\''+o.id+'\',\'approve\')">Approve</button>':'')+(canStage?'<button class="btn btn-sm btn-g" onclick="actOrder(\''+o.id+'\',\'stage\')">Stage Now</button>':'')+(canAct?'<button class="btn btn-sm btn-d" onclick="actOrder(\''+o.id+'\',\'reject\')">Reject</button>':'')+'</div>':''}</div>`;}).join('');
+}
+async function actOrder(id,action){if(action==='reject'){const note=prompt('Reason?')||'';try{await api('POST','/orders/'+id+'/'+action,{note});}catch(e){toast(e.message);return;}}else{try{await api('POST','/orders/'+id+'/'+action);}catch(e){toast(e.message);return;}}await loadOrders();await loadJobs();renderOrders();await loadNotifs();renderNotifs();toast(action==='stage'?'Parts staged':action==='approve'?'Approved':'Rejected');}
+
+// HOURS
+async function loadHours(){try{hoursData=await api('GET','/attendance/report');}catch(e){hoursData=null;}renderHours();}
+function hoursView(v){currentHoursView=v;['tech','job','raw'].forEach(x=>document.getElementById('hrs-'+x+'-btn').className='tab-btn'+(v===x?' active':''));renderHours();}
+function renderHours(){
+  const el=document.getElementById('hours-body');if(!el)return;
+  if(!hoursData){el.innerHTML='<div class="empty">Loading...</div>';return;}
+  if(currentHoursView==='tech'){
+    if(!hoursData.by_tech.length){el.innerHTML='<div class="empty">No attendance records yet</div>';return;}
+    el.innerHTML=hoursData.by_tech.map(t=>{const jobRows=Object.entries(t.jobs).map(([jid,hrs])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:.5px solid var(--border2);font-size:13px"><span style="color:var(--text2)">${jid}</span><span>${hrs} hrs</span></div>`).join('');return`<div class="card" style="margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div><div style="font-size:15px;font-weight:600">${t.name}</div><div class="pa">${roleLabel(t.role)}</div></div><div style="font-size:22px;font-weight:700;color:var(--blue-t)">${t.total_hours}<span style="font-size:12px;font-weight:400;color:var(--text2)"> hrs</span></div></div>${jobRows}</div>`;}).join('');
+  }else if(currentHoursView==='job'){
+    if(!hoursData.by_job.length){el.innerHTML='<div class="empty">No attendance records yet</div>';return;}
+    el.innerHTML=hoursData.by_job.map(j=>{const techRows=Object.entries(j.techs).map(([name,hrs])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:.5px solid var(--border2);font-size:13px"><span style="color:var(--text2)">${name}</span><span>${hrs} hrs</span></div>`).join('');return`<div class="card" style="margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div style="font-size:15px;font-weight:600">${j.job_id}</div><div style="font-size:22px;font-weight:700;color:var(--amber-t)">${j.total_hours}<span style="font-size:12px;font-weight:400;color:var(--text2)"> hrs</span></div></div>${techRows}</div>`;}).join('');
+  }else{
+    if(!hoursData.raw.length){el.innerHTML='<div class="empty">No records yet</div>';return;}
+    el.innerHTML=hoursData.raw.map(r=>`<div class="prow"><div class="pi"><div class="pid">${r.user_name}<span class="role-badge role-${r.user_role}" style="margin-left:5px">${r.user_role}</span></div><div class="pn">Job ${r.job_id}</div><div class="pa">${fmtDateTime(r.sign_in_at)} \u2192 ${r.sign_out_at?fmtDateTime(r.sign_out_at):'<span style="color:var(--green-t)">Still on site</span>'}</div></div><div style="font-size:15px;font-weight:600;text-align:right">${r.hours!=null?r.hours+' hrs':'\u2022'}</div></div>`).join('');
+  }
+}
+function exportHoursCSV(){if(!hoursData){toast('No data');return;}const rows=[['Name','Role','Job ID','Sign In','Sign Out','Hours']];hoursData.raw.forEach(r=>rows.push([r.user_name,r.user_role,r.job_id,r.sign_in_at||'',r.sign_out_at||'',r.hours||'']));dlCSV(fmtCSV(rows),'hours_report.csv');toast('Exported');}
+
+// REPORT
+async function renderReport(){
+  const fj=(document.getElementById('rpt-job')?.value||'').trim();const el=document.getElementById('report-body');el.innerHTML='<div class="empty">Loading...</div>';
+  try{
+    const data=await api('GET','/report'+(fj?'?job='+encodeURIComponent(fj):''));const{staged,signedOut,installed,overages,lowStock}=data;
+    let html=`<div class="sum-cards"><div class="sum-card blue"><div class="sv">${data.jobs}</div><div class="sl">Active jobs</div></div><div class="sum-card amber"><div class="sv">${staged.length}</div><div class="sl">Staged</div></div><div class="sum-card green"><div class="sv">${signedOut.length}</div><div class="sl">Signed out</div></div><div class="sum-card"><div class="sv" style="color:var(--teal-t)">${installed.length}</div><div class="sl">Installed</div></div></div>`;
+    if(overages.length)html+=`<div class="over-flag" style="margin-bottom:14px"><div class="ot">Overages: ${overages.length}</div></div>`;
+    if(lowStock.length)html+=`<div class="bb bb-err" style="margin-bottom:14px"><div class="bm"><strong>Low stock: ${lowStock.length}</strong><br>${lowStock.map(i=>i.name+' ('+i.qty+' left)').join(', ')}</div></div>`;
+    const sec=(title,items,rowFn)=>`<div style="background:var(--bg2);border-radius:var(--r);border:.5px solid var(--border2);margin-bottom:14px;overflow:hidden"><div style="padding:12px 14px;border-bottom:.5px solid var(--border2);font-size:14px;font-weight:600">${title}</div><div style="padding:0 14px">${items.length?items.map(rowFn).join(''):'<div style="padding:12px 0;font-size:13px;color:var(--text2)">None.</div>'}</div></div>`;
+    html+=sec('Staged ('+staged.length+')',staged,p=>`<div class="prow"><div class="pi"><div style="font-size:13px;font-weight:500">${p.part_name}</div><div class="pn">Job ${p.job_id} \u00b7 ${p.part_id} \u00b7 qty ${p.assigned_qty}</div><div class="pa">By ${p.staged_by} \u00b7 ${p.staged_at}</div></div><span class="ps s-staged">staged</span></div>`);
+    html+=sec('Signed out ('+signedOut.length+')',signedOut,p=>`<div class="prow"><div class="pi"><div style="font-size:13px;font-weight:500">${p.part_name}</div><div class="pn">Job ${p.job_id} \u00b7 taken ${p.taken_qty||1}</div><div class="pa">Out: ${p.signed_out_by||'--'}</div></div><span class="ps s-out">out</span></div>`);
+    if(installed.length)html+=sec('Installed ('+installed.length+')',installed,p=>`<div class="prow"><div class="pi"><div style="font-size:13px;font-weight:500">${p.part_name}</div><div class="pn">Job ${p.job_id} \u00b7 installed ${p.installed_qty}</div><div class="pa">By ${p.installed_by||'--'}</div></div><span class="ps s-inst">installed</span></div>`);
+    el.innerHTML=html;
+  }catch(e){el.innerHTML='<div class="empty">Error: '+e.message+'</div>';}
+}
+async function exportRptCSV(type){
+  try{const data=await api('GET','/report');const now=new Date().toLocaleDateString('en-US');let rows,fn;if(type==='staged'){rows=[['Job','Part ID','Part Name','Qty','Staged By','Staged At']];data.staged.forEach(p=>rows.push([p.job_id,p.part_id,p.part_name,p.assigned_qty,p.staged_by,p.staged_at]));fn='staged_'+now.replace(/\//g,'-')+'.csv';}else if(type==='signedout'){rows=[['Job','Part ID','Part Name','Taken Qty','Overage','Staged By','Out By','Out At']];[...data.signedOut,...data.overages].forEach(p=>rows.push([p.job_id,p.part_id,p.part_name,p.taken_qty||1,p.over?'YES':'',p.staged_by,p.signed_out_by||'',p.signed_out_at||'']));fn='signedout_'+now.replace(/\//g,'-')+'.csv';}else{rows=[['Date','Job','Part ID','Part Name','Status','Assigned','Taken','Installed','Staged By','Staged At','Out By','Out At','Installed By','Installed At']];[...data.staged,...data.signedOut,...data.installed,...data.overages].forEach(p=>rows.push([now,p.job_id,p.part_id,p.part_name,p.status,p.assigned_qty,p.taken_qty||0,p.installed_qty||0,p.staged_by||'',p.staged_at||'',p.signed_out_by||'',p.signed_out_at||'',p.installed_by||'',p.installed_at||'']));fn='full_report_'+now.replace(/\//g,'-')+'.csv';}dlCSV(fmtCSV(rows),fn);toast('Exported');}catch(e){toast('Error: '+e.message);}
+}
+
+// LOG
+async function loadLog(){try{logData=await api('GET','/log');renderLog();}catch(e){document.getElementById('log-list').innerHTML='<div class="empty">Access denied</div>';}}
+function renderLog(){const q=(document.getElementById('log-filter')?.value||'').toLowerCase();const el=document.getElementById('log-list');const items=logData.filter(l=>!q||(l.job_id+l.part_name+l.username+l.part_id).toLowerCase().includes(q));if(!items.length){el.innerHTML='<div class="empty">No activity</div>';return;}el.innerHTML=items.map(l=>`<div class="prow"><div class="pi"><div class="pid">${l.username}<span class="badge ${l.type==='staged'?'b-staged':l.type==='over'?'b-over':'b-out'}">${l.type}</span></div><div class="pn">${l.part_name||''} \u00b7 job ${l.job_id||''}${l.extra?' \u00b7 '+l.extra:''}</div><div class="pa">${fmtDate(l.created_at)}</div></div></div>`).join('');}
+function exportLogCSV(){const rows=[['Timestamp','User','Action','Part Name','Part ID','Job ID','Notes']];logData.forEach(l=>rows.push([l.created_at,l.username,l.type,l.part_name||'',l.part_id||'',l.job_id||'',l.extra||'']));dlCSV(fmtCSV(rows),'audit_log.csv');toast('Exported');}
+
+// ADMIN
+async function loadUsers(){if(CU?.role!=='admin'){hideEl('admin-wrap');showEl('admin-lock');return;}try{const users=await api('GET','/users');renderUsers(users);}catch(e){toast(e.message);}}
+function renderUsers(users){document.getElementById('users-list').innerHTML=users.map(u=>`<div class="card" style="margin-bottom:8px"><div style="font-size:15px;font-weight:600">${u.name} ${u.id===CU?.id?'<span style="font-size:11px;color:var(--text3)">(you)</span>':''}<span class="role-badge role-${u.role}">${u.role}</span>${!u.active?'<span class="badge" style="background:var(--red-bg);color:var(--red-t)">disabled</span>':''}</div><div class="pn">@${u.username} \u00b7 ${fmtDate(u.created_at)}</div><div class="row" style="margin-top:8px"><button class="btn btn-sm" onclick="openEditUser('${u.id}','${u.name.replace(/'/g,"\\'")}','${u.role}',${u.active})">Edit</button>${u.id!==CU?.id?'<button class="btn btn-sm btn-d" onclick="delUser(\''+u.id+'\',\''+u.name.replace(/'/g,"\\'")+'\')" >Delete</button>':''}</div></div>`).join('');}
+async function createUser(){const name=document.getElementById('a-name').value.trim(),username=document.getElementById('a-user').value.trim(),password=document.getElementById('a-pass').value,role=document.getElementById('a-role').value;if(!name||!username||!password){toast('All fields required');return;}if(password.length<6){toast('Password min 6 chars');return;}try{await api('POST','/users',{name,username,password,role});['a-name','a-user','a-pass'].forEach(id=>document.getElementById(id).value='');loadUsers();toast('User created');}catch(e){toast('Error: '+e.message);}}
+function openEditUser(id,name,role,active){document.getElementById('eu-id').value=id;document.getElementById('eu-name').value=name;document.getElementById('eu-role').value=role;document.getElementById('eu-active').value=active?'1':'0';document.getElementById('eu-pass').value='';showEl('eu-modal');}
+async function saveEditUser(){const id=document.getElementById('eu-id').value;const body={name:document.getElementById('eu-name').value.trim(),role:document.getElementById('eu-role').value,active:document.getElementById('eu-active').value==='1'};const pass=document.getElementById('eu-pass').value;if(pass){if(pass.length<6){toast('Password min 6 chars');return;}body.password=pass;}try{await api('PUT','/users/'+id,body);hideEl('eu-modal');loadUsers();toast('Saved');}catch(e){toast(e.message);}}
+async function delUser(id,name){if(!confirm('Delete '+name+'?'))return;try{await api('DELETE','/users/'+id);loadUsers();toast('Deleted');}catch(e){toast(e.message);}}
+
+
 function peOpen(jobId, plan, imgUrl, existingMarkupUrl){
   peJobId=jobId; pePlanRecord=plan; pePlanId=plan.id;
   peLegendData=plan._legend||[]; peHistory=[];

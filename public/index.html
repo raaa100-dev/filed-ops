@@ -171,6 +171,15 @@ canvas.markup-canvas{border-radius:var(--rs);width:100%;touch-action:none;border
 .att-row:last-child{border-bottom:none}
 .att-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .att-active{background:var(--green-t)}.att-done{background:var(--text3)}
+.pe-tool{width:32px;height:32px;border-radius:6px;border:.5px solid var(--border);background:var(--bg);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;transition:background .1s}
+.pe-tool.active{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.pe-tool:active{opacity:.7}
+.pe-color{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:transform .1s}
+.pe-color.active{border-color:var(--text);transform:scale(1.2)}
+.pe-color:active{transform:scale(.9)}
+.legend-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid var(--border2)}
+.legend-row:last-child{border-bottom:none}
+.legend-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -498,26 +507,78 @@ canvas.markup-canvas{border-radius:var(--rs);width:100%;touch-action:none;border
 </div>
 
 <!-- MARKUP MODAL -->
-<div class="modal-ov" id="markup-modal" style="display:none">
-  <div class="modal-sh" style="max-height:92vh">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:16px;font-weight:700" id="markup-title">Plan Markup</div>
-      <button class="btn btn-sm btn-d" onclick="hideEl('markup-modal')">Close</button>
+<!-- PLAN EDITOR (full-screen) -->
+<div id="plan-editor" style="display:none;position:fixed;inset:0;z-index:2000;background:var(--bg);flex-direction:column;overflow:hidden">
+  <!-- Top bar -->
+  <div style="display:flex;align-items:center;gap:6px;padding:8px 10px max(8px,env(safe-area-inset-top));border-bottom:.5px solid var(--border);background:var(--bg);flex-shrink:0;flex-wrap:wrap">
+    <div style="font-size:14px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="pe-title">Plan</div>
+    <button class="btn btn-sm btn-g" onclick="peSave()" id="pe-save-btn">&#128190; Save</button>
+    <button class="btn btn-sm btn-b" onclick="peDownload()">&#11015; Download</button>
+    <button class="btn btn-sm btn-d" onclick="peClose()">Close</button>
+  </div>
+  <!-- Tool bar -->
+  <div style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-bottom:.5px solid var(--border);background:var(--bg2);flex-shrink:0;overflow-x:auto" id="pe-toolbar">
+    <!-- Tool mode buttons -->
+    <button class="pe-tool active" id="pe-tool-draw" onclick="peSetTool('draw')" title="Draw">&#9998;</button>
+    <button class="pe-tool" id="pe-tool-dot" onclick="peSetTool('dot')" title="Place dot">&#11044;</button>
+    <button class="pe-tool" id="pe-tool-text" onclick="peSetTool('text')" title="Add text">T</button>
+    <button class="pe-tool" id="pe-tool-erase" onclick="peSetTool('erase')" title="Eraser">&#9003;</button>
+    <div style="width:.5px;background:var(--border);height:24px;flex-shrink:0;margin:0 2px"></div>
+    <!-- Color palette -->
+    <div class="pe-color active" style="background:#E24B4A" data-color="#E24B4A" onclick="peSetColor('#E24B4A',this)"></div>
+    <div class="pe-color" style="background:#185fa5" data-color="#185fa5" onclick="peSetColor('#185fa5',this)"></div>
+    <div class="pe-color" style="background:#27500a" data-color="#27500a" onclick="peSetColor('#27500a',this)"></div>
+    <div class="pe-color" style="background:#f5b800" data-color="#f5b800" onclick="peSetColor('#f5b800',this)"></div>
+    <div class="pe-color" style="background:#9b59b6" data-color="#9b59b6" onclick="peSetColor('#9b59b6',this)"></div>
+    <div class="pe-color" style="background:#1d1d1f" data-color="#1d1d1f" onclick="peSetColor('#1d1d1f',this)"></div>
+    <div style="width:.5px;background:var(--border);height:24px;flex-shrink:0;margin:0 2px"></div>
+    <!-- Dot size (shown when dot tool active) -->
+    <div id="pe-dot-size-wrap" style="display:none;align-items:center;gap:4px">
+      <span style="font-size:10px;color:var(--text2)">Size</span>
+      <input type="range" id="pe-dot-size" min="4" max="24" value="10" style="width:60px" oninput="peDotSize=parseInt(this.value)"/>
     </div>
-    <div class="markup-tools">
-      <div class="color-dot active" style="background:#E24B4A" onclick="setDrawColor('#E24B4A',this)"></div>
-      <div class="color-dot" style="background:#1d1d1f" onclick="setDrawColor('#1d1d1f',this)"></div>
-      <div class="color-dot" style="background:#185fa5" onclick="setDrawColor('#185fa5',this)"></div>
-      <div class="color-dot" style="background:#27500a" onclick="setDrawColor('#27500a',this)"></div>
-      <div class="color-dot" style="background:#f5f5f7;border:1px solid var(--border)" onclick="setDrawColor('#f5f5f7',this)"></div>
-      <input type="range" id="brush-size" min="2" max="20" value="4" style="width:70px"/>
-      <button class="btn btn-sm btn-d" onclick="clearMarkup()">Clear</button>
-      <button class="btn btn-sm btn-p" onclick="saveMarkup()">Save</button>
+    <!-- Brush size (shown when draw/erase active) -->
+    <div id="pe-brush-size-wrap" style="display:flex;align-items:center;gap:4px">
+      <span style="font-size:10px;color:var(--text2)">Size</span>
+      <input type="range" id="pe-brush-size" min="2" max="30" value="4" style="width:60px" oninput="peBrushSize=parseInt(this.value)"/>
     </div>
-    <canvas id="markup-canvas" class="markup-canvas"></canvas>
-    <div class="fl" style="margin-top:12px">Notes</div>
-    <textarea id="markup-notes" style="margin-bottom:10px"></textarea>
-    <button class="btn btn-g" onclick="saveMarkupAndNotes()">Save markup &amp; notes</button>
+    <div style="width:.5px;background:var(--border);height:24px;flex-shrink:0;margin:0 2px"></div>
+    <button class="btn btn-sm" onclick="peUndo()" title="Undo">&#8630;</button>
+    <button class="btn btn-sm btn-d" onclick="peClear()" title="Clear markup">&#128465;</button>
+    <button class="btn btn-sm btn-w" onclick="peLegend()" title="Legend">&#128220; Legend</button>
+  </div>
+  <!-- Canvas area -->
+  <div style="flex:1;overflow:auto;background:#888;display:flex;align-items:flex-start;justify-content:center;padding:8px" id="pe-canvas-wrap">
+    <canvas id="pe-canvas" style="touch-action:none;cursor:crosshair;max-width:100%;display:block"></canvas>
+  </div>
+  <!-- Text input (shown when placing text) -->
+  <div id="pe-text-bar" style="display:none;padding:8px 10px;border-top:.5px solid var(--border);background:var(--bg);flex-shrink:0">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:5px">Type text then tap on plan to place it</div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="pe-text-input" placeholder="Label text..." style="flex:1;margin-bottom:0"/>
+      <input type="range" id="pe-font-size" min="10" max="48" value="18" style="width:60px" oninput="peFontSize=parseInt(this.value)"/>
+      <span style="font-size:11px;color:var(--text2);display:flex;align-items:center" id="pe-font-size-lbl">18px</span>
+    </div>
+  </div>
+  <!-- Legend panel -->
+  <div id="pe-legend-panel" style="display:none;border-top:.5px solid var(--border);background:var(--bg);flex-shrink:0;padding:10px;max-height:200px;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:700">Legend</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-g" onclick="peAddLegendItem()">+ Add</button>
+        <button class="btn btn-sm" onclick="hideEl('pe-legend-panel')">&#215; Close</button>
+      </div>
+    </div>
+    <div id="pe-legend-items"></div>
+  </div>
+</div>
+<!-- Text input popup for clicking on canvas -->
+<div id="pe-textpop" style="display:none;position:fixed;z-index:3000;background:var(--bg);border:.5px solid var(--border);border-radius:var(--r);padding:10px;box-shadow:0 4px 24px rgba(0,0,0,.2);width:240px">
+  <div style="font-size:12px;font-weight:600;margin-bottom:6px">Add text</div>
+  <input type="text" id="pe-textpop-input" placeholder="Label..." style="margin-bottom:8px"/>
+  <div style="display:flex;gap:6px">
+    <button class="btn btn-sm btn-p" onclick="peConfirmText()" style="flex:1">Place</button>
+    <button class="btn btn-sm" onclick="hideEl('pe-textpop')">Cancel</button>
   </div>
 </div>
 
@@ -530,209 +591,325 @@ let CU=null,catalog={},jobs={},invData={},notifData=[],logData=[],ordParts=[],or
 let recent=JSON.parse(localStorage.getItem('wh_recent')||'[]');
 let cart={mode:'stage',items:{}};
 let camActive={},torchOn=false,torchTrack=null,scanCD=false;
-let markupCanvas=null,markupCtx=null,markupDrawing=false,drawColor='#E24B4A',drawSize=4;
-let currentMarkupPlan=null,currentMarkupJobId=null,markupImg=null;
-let currentHoursView='tech';
+// ── PLAN EDITOR ─────────────────────────────────────────────────────────────
+let peCanvas=null,peCtx=null,peTool='draw',peColor='#E24B4A',peBrushSize=4,peDotSize=10,peFontSize=18;
+let peDrawing=false,peBaseImg=null,peHistory=[],pePendingTextPos=null;
+let pePlanId=null,peJobId=null,pePlanRecord=null;
+// Legend: [{color, label}]
+let peLegendData=[];
 
-async function api(method,path,body){
-  const opts={method,headers:{'Content-Type':'application/json'}};
-  if(token)opts.headers['Authorization']='Bearer '+token;
-  if(body)opts.body=JSON.stringify(body);
-  try{const r=await fetch(API+path,opts);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Server error '+r.status);return d;}
-  catch(e){if(e.message.includes('Failed to fetch'))throw new Error('Cannot reach server');throw e;}
-}
-function toast(m,d=2500){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),d);}
-function showEl(id){const e=document.getElementById(id);if(e)e.style.display='';}
-function hideEl(id){const e=document.getElementById(id);if(e)e.style.display='none';}
-function fmtCSV(rows){return rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');}
-function dlCSV(csv,fn){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=fn;a.click();}
-function fmtDate(d){if(!d)return '--';try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return d;}}
-function fmtDateTime(d){if(!d)return '--';try{return new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});}catch(e){return d;}}
-function daysUntil(d){if(!d)return null;const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(d)-t)/864e5);}
+const PE_COLORS=['#E24B4A','#185fa5','#27500a','#f5b800','#9b59b6','#1d1d1f'];
 
-async function init(){
-  hideEl('app');showEl('login-screen');
-  if(token){try{CU=await api('GET','/me');showApp();return;}catch(e){token=null;localStorage.removeItem('wh_token');document.getElementById('server-status').textContent='Session expired';}}
-}
-async function doLogin(){
-  const u=document.getElementById('l-user').value.trim(),p=document.getElementById('l-pass').value;
-  const btn=document.getElementById('login-btn'),err=document.getElementById('login-err');
-  if(!u||!p){err.textContent='Enter username and password';err.style.display='block';return;}
-  btn.disabled=true;btn.textContent='Signing in...';err.style.display='none';
-  try{const d=await api('POST','/login',{username:u,password:p});token=d.token;CU=d.user;localStorage.setItem('wh_token',token);showApp();}
-  catch(e){err.textContent=e.message;err.style.display='block';btn.disabled=false;btn.textContent='Sign In';}
-}
-function doLogout(){if(confirm('Sign out?')){token=null;CU=null;localStorage.removeItem('wh_token');location.reload();}}
-function roleLabel(r){return{admin:'Administrator',stager:'Stager',signout:'Sign-out',requestor:'Requestor',technician:'Technician',foreman:'Foreman'}[r]||r;}
+function peOpen(jobId, plan, imgUrl, existingMarkupUrl){
+  peJobId=jobId; pePlanRecord=plan; pePlanId=plan.id;
+  peLegendData=plan._legend||[]; peHistory=[];
+  const editor=document.getElementById('plan-editor');
+  editor.style.display='flex';
+  document.getElementById('pe-title').textContent=plan.name||'Plan';
+  peCanvas=document.getElementById('pe-canvas');
+  peCtx=peCanvas.getContext('2d');
+  peBaseImg=null;
 
-function showApp(){
-  hideEl('login-screen');document.getElementById('app').style.display='flex';
-  document.getElementById('user-pill').textContent=CU.name;
-  document.getElementById('hdr-sub').textContent=roleLabel(CU.role);
-  if(CU.role==='admin'){showEl('nav-log');showEl('nav-admin');}
-  const canEdit=['admin','stager','foreman'].includes(CU.role);
-  if(!canEdit){hideEl('job-create-section');hideEl('cat-edit-section');}
-  if(CU.role==='requestor'||CU.role==='signout')hideEl('scan-main');
-  if(CU.role==='requestor')showEl('perm-req-lock');
-  if(CU.role==='signout')document.getElementById('mode-stage').disabled=true;
-  loadAll();show('dash');
-}
-async function loadAll(){
-  await Promise.all([loadCatalog(),loadJobs(),loadNotifs(),loadInv()]);
-  await loadSchedule();renderDash();renderRecent();
-}
-function show(n){
-  stopAllCams();
-  document.querySelectorAll('.sc').forEach(s=>s.classList.remove('active'));
-  document.querySelectorAll('.nav button').forEach(b=>{b.classList.toggle('active',(b.getAttribute('onclick')||'').includes("'"+n+"'"));});
-  const sc=document.getElementById('sc-'+n);if(sc)sc.classList.add('active');
-  if(n==='jobs')renderJobs();if(n==='catalog')renderCat();if(n==='report')renderReport();
-  if(n==='log')loadLog();if(n==='admin')loadUsers();if(n==='inv')renderInv();
-  if(n==='notif'){loadNotifs();renderNotifs();}if(n==='orders'){loadOrders();renderOrders();}
-  if(n==='schedule')loadSchedule();if(n==='dash')renderDash();
-  if(n==='hours')loadHours();
-  if(n==='financials')loadFinancials();
-}
-
-// CATALOG
-async function loadCatalog(){try{const d=await api('GET','/catalog');catalog={};d.forEach(c=>{catalog[c.barcode]=c;(c.alt_barcodes||[]).forEach(ab=>{if(ab&&ab.trim())catalog[ab.trim()]=c;});});}catch(e){}}
-function lookup(bc){return bc?catalog[bc.trim()]||null:null;}
-function resolveCatBC(val){const el=document.getElementById('cat-bc-res');if(!el)return;const v=(val||'').trim();if(!v){el.style.display='none';return;}const p=lookup(v);el.style.display='block';el.innerHTML=p?'<div class="bb bb-ok"><div class="bn">'+p.name+'</div><div class="bm">Already in catalog</div></div>':'<div class="bb bb-warn"><div class="bm">New barcode</div></div>';}
-async function saveCat(){
-  const bc=document.getElementById('c-bc').value.trim(),nm=document.getElementById('c-nm').value.trim();
-  if(!bc||!nm){toast('Barcode and name required');return;}
-  const alts=document.getElementById('c-alt').value.trim().split(',').map(a=>a.trim()).filter(Boolean);
-  const cost=parseFloat(document.getElementById('c-cost')?.value.trim())||0;
-  try{await api('POST','/catalog',{barcode:bc,name:nm,part_number:document.getElementById('c-pn').value.trim(),category:document.getElementById('c-cat').value.trim(),description:document.getElementById('c-desc').value.trim(),alt_barcodes:alts,unit_cost:cost});['c-bc','c-alt','c-pn','c-nm','c-cat','c-desc','c-cost'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});hideEl('cat-bc-res');await loadCatalog();renderCat();toast('Saved: '+nm);}
-  catch(e){toast('Error: '+e.message);}
-}
-function renderCat(){
-  const q=(document.getElementById('c-search')?.value||'').toLowerCase();
-  const unique=Object.values(catalog).filter((c,i,a)=>a.findIndex(x=>x.barcode===c.barcode)===i);
-  const items=unique.filter(c=>(c.name+c.barcode+(c.part_number||'')+(c.category||'')).toLowerCase().includes(q));
-  const el=document.getElementById('c-list');if(!el)return;
-  if(!items.length){el.innerHTML='<div class="empty">No parts in catalog</div>';return;}
-  el.innerHTML=items.map(c=>`<div class="prow"><div class="pi"><div class="pid">${c.name}</div><div class="pn">${[c.part_number,c.barcode,c.category].filter(Boolean).join(' \u00b7 ')}${c.unit_cost>0?' \u00b7 $'+Number(c.unit_cost).toFixed(2):''}</div>${c.alt_barcodes?.length?'<div class="pa">Alt: '+c.alt_barcodes.join(', ')+'</div>':''}${c.description?'<div class="pa">'+c.description+'</div>':''}</div>${CU?.role==='admin'?'<button class="ib" style="color:var(--red-t)" onclick="delCat(\''+c.barcode+'\')">&#215;</button>':''}</div>`).join('');
-}
-async function delCat(bc){if(!confirm('Remove?'))return;try{await api('DELETE','/catalog/'+encodeURIComponent(bc));await loadCatalog();renderCat();toast('Removed');}catch(e){toast(e.message);}}
-function exportCatCSV(){const u=Object.values(catalog).filter((c,i,a)=>a.findIndex(x=>x.barcode===c.barcode)===i);const rows=[['barcode','alt_barcodes','part_number','name','category','description']];u.forEach(c=>rows.push([c.barcode,(c.alt_barcodes||[]).join(','),c.part_number||'',c.name,c.category||'',c.description||'']));dlCSV(fmtCSV(rows),'catalog.csv');toast('Exported');}
-function importCatCSV(input){
-  const file=input.files[0];if(!file)return;
-  const r=new FileReader();r.onload=async e=>{
-    const lines=e.target.result.split('\n').filter(l=>l.trim());let hdr=null,count=0;
-    for(const line of lines){const cols=line.match(/("(?:[^"]|"")*"|[^,]*)/g).map(v=>v.replace(/^"|"$/g,'').replace(/""/g,'"'));if(!hdr){hdr=cols.map(h=>h.trim().toLowerCase());continue;}const idx=f=>hdr.indexOf(f);const bc=cols[idx('barcode')]?.trim(),nm=cols[idx('name')]?.trim();if(!bc||!nm)continue;const alts=cols[idx('alt_barcodes')]?.trim().split(',').map(a=>a.trim()).filter(Boolean)||[];try{await api('POST','/catalog',{barcode:bc,name:nm,part_number:cols[idx('part_number')]?.trim()||'',category:cols[idx('category')]?.trim()||'',description:cols[idx('description')]?.trim()||'',alt_barcodes:alts});count++;}catch(ex){}}
-    await loadCatalog();renderCat();toast('Imported '+count);input.value='';
-  };r.readAsText(file);
+  // Load base image
+  const img=new Image(); img.crossOrigin='anonymous';
+  img.onload=()=>{
+    peCanvas.width=img.naturalWidth||800;
+    peCanvas.height=img.naturalHeight||600;
+    peCtx.drawImage(img,0,0);
+    peBaseImg=img;
+    if(existingMarkupUrl){
+      const ov=new Image(); ov.crossOrigin='anonymous';
+      ov.onload=()=>{ peCtx.drawImage(ov,0,0,peCanvas.width,peCanvas.height); peHistory=[]; pePushHistory(); };
+      ov.onerror=()=>pePushHistory();
+      ov.src=existingMarkupUrl;
+    } else { pePushHistory(); }
+    peSetupEvents();
+    peLegendData=[]; peRenderLegendItems();
+  };
+  img.onerror=()=>{
+    // Try PDF.js if image fails
+    if(imgUrl.toLowerCase().includes('.pdf')||imgUrl.includes('/raw/')){
+      toast('Loading PDF...',2000);
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      pdfjsLib.getDocument(imgUrl).promise.then(pdf=>pdf.getPage(1)).then(page=>{
+        const vp=page.getViewport({scale:1.5});
+        peCanvas.width=vp.width; peCanvas.height=vp.height;
+        page.render({canvasContext:peCtx,viewport:vp}).promise.then(()=>{
+          peBaseImg=null; // can't cache CORS-blocked canvas
+          if(existingMarkupUrl){
+            const ov=new Image(); ov.crossOrigin='anonymous';
+            ov.onload=()=>{ peCtx.drawImage(ov,0,0,peCanvas.width,peCanvas.height); pePushHistory(); };
+            ov.onerror=()=>pePushHistory();
+            ov.src=existingMarkupUrl;
+          } else { pePushHistory(); }
+          peSetupEvents();
+        });
+      }).catch(()=>{ toast('Could not load plan',4000); peClose(); });
+    } else {
+      // Blank canvas fallback
+      peCanvas.width=800; peCanvas.height=600;
+      peCtx.fillStyle='#f0f0f0'; peCtx.fillRect(0,0,800,600);
+      peCtx.fillStyle='#999'; peCtx.font='16px sans-serif'; peCtx.textAlign='center';
+      peCtx.fillText('No plan image available — draw freely',400,300);
+      pePushHistory(); peSetupEvents();
+    }
+  };
+  img.src=imgUrl;
 }
 
-// RESOLVE
-function resolveBC(val,elId){const el=document.getElementById(elId);if(!el)return;const v=(val||'').trim();if(!v){el.style.display='none';return;}const p=lookup(v);el.style.display='block';el.innerHTML=p?'<div class="bb bb-ok"><div class="bn">'+p.name+(p.part_number?' \u00b7 '+p.part_number:'')+'</div><div class="bm">'+(p.category||p.description||v)+'</div></div>':'<div class="bb bb-warn"><div class="bm">Unknown barcode</div></div>';}
-function resolveInvBC(val){const el=document.getElementById('inv-bc-res');if(!el)return;const v=(val||'').trim();if(!v){el.style.display='none';return;}const p=lookup(v);el.style.display='block';if(p){el.innerHTML='<div class="bb bb-ok"><div class="bn">'+p.name+'</div><div class="bm">Found in catalog</div></div>';document.getElementById('i-nm').value=p.name;document.getElementById('i-desc').value=p.description||'';}else{el.innerHTML='<div class="bb bb-warn"><div class="bm">Unknown barcode</div></div>';document.getElementById('i-nm').value='';}}
-
-// BEEP
-function playBeep(){try{const ctx=new(window.AudioContext||window.webkitAudioContext)();[[880,0],[1100,.1]].forEach(([f,d])=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type='sine';o.frequency.value=f;const t=ctx.currentTime+d;g.gain.setValueAtTime(.4,t);g.gain.exponentialRampToValueAtTime(.001,t+.15);o.start(t);o.stop(t+.15);});setTimeout(()=>ctx.close(),600);}catch(e){}}
-
-// CAMERAS
-function stopAllCams(){Object.keys(camActive).forEach(k=>{if(camActive[k])stopCam(k);});}
-function toggleCam(key){camActive[key]?stopCam(key):startCam(key);}
-function camEls(key){const m={main:{wrap:'cam-wrap-main',prev:'cam-prev-main',btn:'cam-btn-main',status:'cam-status-main',det:'cam-det-main',detTxt:'cam-det-text-main'},cat:{wrap:'cat-cam-wrap',prev:'cam-prev-cat',btn:'cat-cam-btn',status:'cam-status-cat',det:'cam-det-cat',detTxt:'cam-det-text-cat'},inv:{wrap:'inv-cam-wrap',prev:'cam-prev-inv',btn:'inv-cam-btn',status:'cam-status-inv',det:'cam-det-inv',detTxt:'cam-det-text-inv'}};return m[key]||m.main;}
-function startCam(key){
-  const e=camEls(key);let wrap=document.getElementById(e.wrap);
-  if(!wrap){wrap=document.createElement('div');wrap.id=e.wrap;wrap.style.marginBottom='8px';wrap.innerHTML='<div class="cam-wrap"><div id="'+e.prev+'"></div><div class="cam-overlay"><div class="scan-rect"><div class="scan-line"></div></div></div><div class="cam-status" id="'+e.status+'">Align barcode</div><div class="cam-det" id="'+e.det+'" style="display:none"><span id="'+e.detTxt+'"></span></div></div>';const btn=document.getElementById(e.btn);if(btn)btn.parentElement.insertAdjacentElement('afterend',wrap);}
-  else wrap.style.display='block';
-  const btn=document.getElementById(e.btn);if(btn)btn.textContent='\u23f9 Stop';
-  Quagga.init({inputStream:{type:'LiveStream',target:document.getElementById(e.prev),constraints:{facingMode:'environment'}},decoder:{readers:['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader','upc_e_reader','codabar_reader','i2of5_reader']},locate:true,numOfWorkers:2,frequency:10},err=>{
-    if(err){toast('Camera not available');stopCam(key);return;}
-    Quagga.start();camActive[key]=true;
-    const st=document.getElementById(e.status);if(st)st.textContent='Align barcode in frame';
-    if(key==='main'){const tr=Quagga.CameraAccess.getActiveTrack();if(tr?.getCapabilities?.().torch){torchTrack=tr;showEl('torch-btn');}}
-  });
-  Quagga.offDetected();
-  Quagga.onDetected(result=>{
-    const code=result.codeResult.code;if(!code||scanCD)return;
-    scanCD=true;try{Quagga.stop();}catch(ex){}camActive[key]=false;
-    playBeep();if(navigator.vibrate)navigator.vibrate([60,40,60]);
-    const det=document.getElementById(e.det),detTxt=document.getElementById(e.detTxt);
-    if(det&&detTxt){detTxt.textContent='\u2713 '+code;det.style.display='block';setTimeout(()=>det.style.display='none',800);}
-    const btn2=document.getElementById(e.btn);if(btn2)btn2.textContent=key==='main'?'\u{1F4F7} Camera':'\u{1F4F7}';
-    const w=document.getElementById(e.wrap);if(w)w.style.display='none';
-    if(key==='main'){torchTrack=null;torchOn=false;hideEl('torch-btn');}
-    scanCD=false;handleScan(key,code);
-  });
-}
-function stopCam(key){if(!camActive[key])return;try{Quagga.stop();}catch(e){}camActive[key]=false;const e=camEls(key);const w=document.getElementById(e.wrap);if(w)w.style.display='none';const btn=document.getElementById(e.btn);if(btn)btn.textContent=key==='main'?'\u{1F4F7} Camera':'\u{1F4F7}';if(key==='main'){torchTrack=null;torchOn=false;hideEl('torch-btn');}}
-function toggleTorch(){if(!torchTrack)return;torchOn=!torchOn;torchTrack.applyConstraints({advanced:[{torch:torchOn}]});document.getElementById('torch-btn').textContent=torchOn?'\u{1F526} ON':'\u{1F526} Torch';}
-function handleScan(key,code){
-  const part=lookup(code);const canon=part?part.barcode:code;
-  if(key==='main'){document.getElementById('s-part').value=canon;resolveBC(canon,'s-resolve');addToCartCode(canon);document.getElementById('s-part').value='';hideEl('s-resolve');showScanModal(canon);}
-  else if(key==='cat'){document.getElementById('c-bc').value=canon;resolveCatBC(canon);if(part){document.getElementById('c-pn').value=part.part_number||'';document.getElementById('c-nm').value=part.name||'';document.getElementById('c-cat').value=part.category||'';document.getElementById('c-desc').value=part.description||'';if(part.alt_barcodes?.length)document.getElementById('c-alt').value=part.alt_barcodes.join(', ');toast('Found -- edit to update');}else{setTimeout(()=>document.getElementById('c-nm').focus(),100);toast('New barcode');}}
-  else if(key==='inv'){document.getElementById('i-bc').value=canon;resolveInvBC(canon);if(part){setTimeout(()=>document.getElementById('i-qty').focus(),100);}else{setTimeout(()=>document.getElementById('i-nm').focus(),100);}}
+function peClose(){
+  document.getElementById('plan-editor').style.display='none';
+  hideEl('pe-legend-panel'); hideEl('pe-text-bar'); hideEl('pe-textpop');
+  peCanvas=null; peCtx=null; peBaseImg=null; peHistory=[]; peLegendData=[];
+  if(peJobId) openJobDetail(peJobId, 'plans');
 }
 
-// SCAN MODAL
-function showScanModal(code){const item=cart.items[code];const p=lookup(code);const nm=item?.name||p?.name||code;const total=Object.values(cart.items).reduce((a,i)=>a+i.qty,0);document.getElementById('sm-part-name').textContent=nm+(item?.qty>1?' \xd7 '+item.qty:'');document.getElementById('sm-sub').innerHTML='In cart \u00b7 <strong>'+total+'</strong> total';showEl('scan-modal');}
-function scanAnother(){hideEl('scan-modal');startCam('main');}
-function scanDone(){hideEl('scan-modal');document.getElementById('cart-box')?.scrollIntoView({behavior:'smooth',block:'center'});}
-
-// CART
-function setMode(m){if(CU?.role==='signout'&&m==='stage'){toast('Not permitted');return;}cart.mode=m;cart.items={};document.getElementById('mode-stage').classList.toggle('active',m==='stage');document.getElementById('mode-out').classList.toggle('active',m==='out');document.getElementById('cart-lbl').textContent=m==='stage'?'Staging cart':'Sign-out cart';document.getElementById('cart-commit-btn').textContent=m==='stage'?'Stage all to job':'Sign out all from job';renderCart();}
-function addToCart(){const c=document.getElementById('s-part').value.trim();if(c)addToCartCode(c);}
-function addToCartCode(code){const p=lookup(code);const canon=p?p.barcode:code;const nm=p?p.name:code;if(cart.items[canon])cart.items[canon].qty++;else cart.items[canon]={id:canon,name:nm,qty:1};renderCart();}
-function cartAdj(id,d){if(!cart.items[id])return;cart.items[id].qty=Math.max(1,cart.items[id].qty+d);renderCart();}
-function cartRm(id){delete cart.items[id];renderCart();}
-function clearCart(){cart.items={};renderCart();}
-function renderCart(){
-  const items=Object.values(cart.items);const box=document.getElementById('cart-box');
-  document.getElementById('cart-cnt').textContent=items.reduce((a,i)=>a+i.qty,0);
-  if(!items.length){box.style.display='none';return;}box.style.display='block';
-  document.getElementById('cart-items').innerHTML=items.map(i=>`<div class="cart-item"><div class="ci"><div class="cn">${i.name!==i.id?i.name:i.id}</div><div class="cb">${i.id}</div></div><div class="qty-c"><button onclick="cartAdj('${i.id}',-1)">-</button><span>${i.qty}</span><button onclick="cartAdj('${i.id}',1)">+</button></div><button class="ib" style="color:var(--red-t)" onclick="cartRm('${i.id}')">&#215;</button></div>`).join('');
+function peSetTool(t){
+  peTool=t;
+  document.querySelectorAll('.pe-tool').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pe-tool-'+t)?.classList.add('active');
+  if(peCanvas) peCanvas.style.cursor=t==='erase'?'cell':t==='text'?'text':'crosshair';
+  document.getElementById('pe-dot-size-wrap').style.display=t==='dot'?'flex':'none';
+  document.getElementById('pe-brush-size-wrap').style.display=(t==='draw'||t==='erase')?'flex':'none';
+  if(t==='text'){showEl('pe-text-bar');document.getElementById('pe-text-input').focus();}
+  else{hideEl('pe-text-bar');hideEl('pe-textpop');}
 }
-async function commitCart(){
-  const jobId=document.getElementById('s-job').value.trim();if(!jobId){toast('Enter a job ID');return;}
-  const items=Object.values(cart.items);if(!items.length){toast('Cart is empty');return;}
-  if(!jobs[jobId]){try{const j=await api('GET','/jobs/'+jobId);jobs[j.id]=j;}catch(e){toast('Job not found -- create it in Jobs first');return;}}
-  let ok=0,errs=[];
-  for(const item of items){
-    try{
-      if(cart.mode==='stage'){await api('POST','/jobs/'+jobId+'/parts',{partId:item.id,part_name:item.name,assignedQty:item.qty});}
-      else{const jparts=await api('GET','/jobs/'+jobId+'/parts');const found=jparts.find(p=>p.part_id===item.id&&p.status==='staged');if(!found){errs.push(item.name+': not staged');continue;}await api('POST','/jobs/'+jobId+'/parts/'+found.id+'/signout',{qty:item.qty});}
-      ok++;
-    }catch(e){errs.push(item.name+': '+e.message);}
+
+function peSetColor(c,el){
+  peColor=c;
+  document.querySelectorAll('.pe-color').forEach(d=>d.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// History (undo)
+function pePushHistory(){
+  peHistory.push(peCanvas.toDataURL());
+  if(peHistory.length>30) peHistory.shift();
+}
+function peUndo(){
+  if(peHistory.length<2){ toast('Nothing to undo'); return; }
+  peHistory.pop();
+  const prev=peHistory[peHistory.length-1];
+  const img=new Image();
+  img.onload=()=>{ peCtx.clearRect(0,0,peCanvas.width,peCanvas.height); peCtx.drawImage(img,0,0); };
+  img.src=prev;
+}
+
+function peClear(){
+  if(!confirm('Clear all markup?')) return;
+  peCtx.clearRect(0,0,peCanvas.width,peCanvas.height);
+  if(peBaseImg) peCtx.drawImage(peBaseImg,0,0);
+  else { peCtx.fillStyle='#f0f0f0'; peCtx.fillRect(0,0,peCanvas.width,peCanvas.height); }
+  pePushHistory();
+}
+
+// ── EVENTS ───────────────────────────────────────────────────────────────────
+function peSetupEvents(){
+  const c=peCanvas;
+  function getPos(e){
+    const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;
+    const src=e.touches?e.touches[0]:e;
+    return {x:(src.clientX-r.left)*sx, y:(src.clientY-r.top)*sy};
   }
-  addRecent(cart.mode,jobId,items);renderRecent();cart.items={};renderCart();await loadJobs();
-  if(errs.length)toast(ok+' done \u2013 '+errs[0],4000);else toast((cart.mode==='stage'?'Staged ':'Signed out ')+ok);
-}
-function addRecent(type,jobId,items){recent.unshift({type,jobId,items:[...items],user:CU?.name,time:new Date().toLocaleTimeString()});if(recent.length>20)recent=recent.slice(0,20);localStorage.setItem('wh_recent',JSON.stringify(recent));}
-function renderRecent(){const el=document.getElementById('s-recent');if(!el)return;if(!recent.length){el.innerHTML='<div class="empty">No activity yet</div>';return;}el.innerHTML=recent.map(r=>{const total=r.items.reduce((a,i)=>a+i.qty,0);const names=r.items.map(i=>i.name!==i.id?i.name:i.id).slice(0,3).join(', ')+(r.items.length>3?' +more':'');return`<div class="prow"><div class="pi"><div class="pid">${r.type==='stage'?'Staged':'Signed out'}: ${r.items.length} type${r.items.length!==1?'s':''}, ${total} total<span class="badge ${r.type==='stage'?'b-staged':'b-out'}">${r.type}</span></div><div class="pn">Job ${r.jobId} \u00b7 ${names}</div><div class="pa">${r.user||''} \u00b7 ${r.time}</div></div></div>`;}).join('');}
+  function down(e){
+    e.preventDefault();
+    if(peTool==='text'){
+      const pos=getPos(e);
+      pePendingTextPos=pos;
+      // Position popup
+      const pop=document.getElementById('pe-textpop');
+      const pr=c.getBoundingClientRect();
+      const sx=c.width/pr.width,sy=c.height/pr.height;
+      const screenX=pr.left+pos.x/sx, screenY=pr.top+pos.y/sy;
+      pop.style.left=Math.min(screenX,window.innerWidth-260)+'px';
+      pop.style.top=Math.max(10,screenY-80)+'px';
+      pop.style.display='block';
+      const inp=document.getElementById('pe-textpop-input');
+      inp.value=document.getElementById('pe-text-input').value||'';
+      inp.focus();
+      return;
+    }
+    if(peTool==='dot'){
+      const {x,y}=getPos(e);
+      pePlaceDot(x,y);
+      pePushHistory();
+      return;
+    }
+    peDrawing=true;
+    peCtx.beginPath();
+    const {x,y}=getPos(e);
+    peCtx.moveTo(x,y);
+  }
+  function move(e){
+    e.preventDefault();
+    if(!peDrawing) return;
+    const {x,y}=getPos(e);
+    if(peTool==='erase'){
+      peCtx.globalCompositeOperation='destination-out';
+      peCtx.beginPath();
+      peCtx.arc(x,y,peBrushSize*2,0,Math.PI*2);
+      peCtx.fill();
+      peCtx.globalCompositeOperation='source-over';
+    } else {
+      peCtx.lineWidth=peBrushSize;
+      peCtx.strokeStyle=peColor;
+      peCtx.lineCap='round';
+      peCtx.lineJoin='round';
+      peCtx.lineTo(x,y);
+      peCtx.stroke();
+    }
+  }
+  function up(e){ if(!peDrawing) return; peDrawing=false; pePushHistory(); }
 
-// JOBS
-async function loadJobs(){try{const d=await api('GET','/jobs');jobs={};d.forEach(j=>jobs[j.id]=j);}catch(e){}}
-async function createJob(){
-  const id=document.getElementById('cj-id').value.trim();if(!id){toast('Job ID required');return;}
-  try{const j=await api('POST','/jobs',{id,name:document.getElementById('cj-name').value.trim(),address:document.getElementById('cj-addr').value.trim(),gc_company:document.getElementById('cj-gcc').value.trim(),gc_contact:document.getElementById('cj-gcn').value.trim(),gc_phone:document.getElementById('cj-gcp').value.trim(),gc_email:document.getElementById('cj-gce').value.trim(),super_name:document.getElementById('cj-supn').value.trim(),super_phone:document.getElementById('cj-supp').value.trim()});hideEl('create-job-modal');['cj-id','cj-name','cj-addr','cj-gcc','cj-gcn','cj-gcp','cj-gce','cj-supn','cj-supp'].forEach(id2=>document.getElementById(id2).value='');jobs[j.id]=j;renderJobs();toast('Job created: '+j.id);showJob(j.id);}
-  catch(e){toast('Error: '+e.message);}
+  c.onmousedown=down; c.onmousemove=move; c.onmouseup=up; c.onmouseleave=up;
+  c.ontouchstart=down; c.ontouchmove=move; c.ontouchend=up;
 }
 
-// JOB CSV IMPORT
-function downloadJobTemplate(){
-  const cols=['id','name','address','gc_company','gc_contact','gc_phone','gc_email','super_name','super_phone','super_email','scope','notes','install_notes','job_walk_by','job_walk_date','job_walk_notes','date_contract','date_permit','date_start','date_roughin','date_trimout','date_inspection','date_next_visit','date_closeout','date_co'];
-  const example=['JOB-2026-001','Main St Office','123 Main St','ABC General','John Smith','555-555-5555','john@abc.com','Mike Jones','555-555-5556','mike@abc.com','Electrical rough-in and trim','Notes here','Install notes here','Jane Doe','2026-04-01','Job walk notes here','2026-03-15','2026-04-01','2026-05-01','2026-06-01','2026-07-01','2026-07-15','2026-05-15','2026-08-01','2026-08-15'];
-  dlCSV(fmtCSV([cols,example]),'jobs_template.csv');toast('Template downloaded');
-}
-function importJobsCSV(input){
-  const file=input.files[0];if(!file)return;
-  const r=new FileReader();r.onload=async e=>{
-    const lines=e.target.result.split('\n').filter(l=>l.trim());let hdr=null;const jobList=[];
-    for(const line of lines){const cols=line.match(/("(?:[^"]|"")*"|[^,]*)/g).map(v=>v.replace(/^"|"$/g,'').replace(/""/g,'"'));if(!hdr){hdr=cols.map(h=>h.trim().toLowerCase());continue;}const obj={};hdr.forEach((h,i)=>obj[h]=cols[i]?.trim()||'');if(obj.id)jobList.push(obj);}
-    if(!jobList.length){toast('No valid rows found');input.value='';return;}
-    try{const result=await api('POST','/jobs/import',{jobs:jobList});await loadJobs();renderJobs();toast('Created: '+result.created.length+(result.skipped.length?' | Skipped: '+result.skipped.length:''));}
-    catch(e){toast('Error: '+e.message);}
-    input.value='';
-  };r.readAsText(file);
+function pePlaceDot(x,y){
+  peCtx.beginPath();
+  peCtx.arc(x,y,peDotSize/2,0,Math.PI*2);
+  peCtx.fillStyle=peColor;
+  peCtx.fill();
+  // Auto-add color to legend if not there
+  if(!peLegendData.find(l=>l.color===peColor)){
+    peLegendData.push({color:peColor,label:''});
+    peRenderLegendItems();
+  }
 }
 
+function peConfirmText(){
+  const txt=document.getElementById('pe-textpop-input').value.trim();
+  hideEl('pe-textpop');
+  if(!txt||!pePendingTextPos) return;
+  const {x,y}=pePendingTextPos;
+  peCtx.font=`bold ${peFontSize}px -apple-system,sans-serif`;
+  peCtx.fillStyle=peColor;
+  peCtx.textAlign='left';
+  // White background for readability
+  const metrics=peCtx.measureText(txt);
+  const pad=4, th=peFontSize;
+  peCtx.fillStyle='rgba(255,255,255,0.8)';
+  peCtx.fillRect(x-pad, y-th-pad, metrics.width+pad*2, th+pad*2);
+  peCtx.fillStyle=peColor;
+  peCtx.fillText(txt,x,y);
+  pePendingTextPos=null;
+  pePushHistory();
+}
+
+document.getElementById('pe-font-size').addEventListener('input',e=>{
+  peFontSize=parseInt(e.target.value);
+  document.getElementById('pe-font-size-lbl').textContent=peFontSize+'px';
+});
+
+// ── LEGEND ───────────────────────────────────────────────────────────────────
+function peLegend(){
+  const panel=document.getElementById('pe-legend-panel');
+  if(panel.style.display==='none'||!panel.style.display){
+    panel.style.display='block';
+    peRenderLegendItems();
+  } else { panel.style.display='none'; }
+}
+
+function peRenderLegendItems(){
+  const el=document.getElementById('pe-legend-items');
+  if(!el) return;
+  if(!peLegendData.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">Place dots on the plan to auto-populate, or click + Add</div>';
+    return;
+  }
+  el.innerHTML=peLegendData.map((item,i)=>`
+    <div class="legend-row">
+      <div class="legend-dot" style="background:${item.color};cursor:pointer" onclick="peLegendPickColor(${i})" title="Click to change color"></div>
+      <input type="text" value="${item.label||''}" placeholder="What this color means..." 
+        style="flex:1;margin-bottom:0;padding:5px 8px;font-size:13px;border-radius:5px"
+        oninput="peLegendData[${i}].label=this.value"/>
+      <button style="background:none;border:none;cursor:pointer;color:var(--red-t);font-size:16px;padding:0 4px" onclick="peLegendData.splice(${i},1);peRenderLegendItems()">&#215;</button>
+    </div>`).join('');
+}
+
+function peAddLegendItem(){
+  const nextColor=PE_COLORS[peLegendData.length % PE_COLORS.length];
+  peLegendData.push({color:nextColor, label:''});
+  peRenderLegendItems();
+}
+
+function peLegendPickColor(idx){
+  const colors=PE_COLORS;
+  const current=peLegendData[idx].color;
+  const next=colors[(colors.indexOf(current)+1)%colors.length];
+  peLegendData[idx].color=next;
+  peRenderLegendItems();
+}
+
+// ── RENDER LEGEND ONTO CANVAS (bottom strip) ─────────────────────────────────
+function peDrawLegendOnCanvas(){
+  const items=peLegendData.filter(l=>l.label);
+  if(!items.length) return;
+  const c=peCanvas, ctx=peCtx;
+  const rowH=22, pad=10, dotR=6, fontSize=13;
+  const totalH=rowH*items.length+pad*2;
+  // White background strip
+  ctx.fillStyle='rgba(255,255,255,0.92)';
+  ctx.fillRect(0, c.height-totalH, c.width, totalH);
+  ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=1;
+  ctx.strokeRect(0, c.height-totalH, c.width, totalH);
+  // Title
+  ctx.font='bold 11px sans-serif'; ctx.fillStyle='#555'; ctx.textAlign='left';
+  ctx.fillText('LEGEND', pad, c.height-totalH+12);
+  items.forEach((item,i)=>{
+    const y=c.height-totalH+pad+rowH*(i+0.5)+6;
+    ctx.beginPath(); ctx.arc(pad+dotR, y, dotR, 0, Math.PI*2);
+    ctx.fillStyle=item.color; ctx.fill();
+    ctx.font=`${fontSize}px -apple-system,sans-serif`;
+    ctx.fillStyle='#1d1d1f'; ctx.textAlign='left';
+    ctx.fillText(item.label, pad+dotR*2+6, y+5);
+  });
+}
+
+// ── SAVE ──────────────────────────────────────────────────────────────────────
+async function peSave(){
+  if(!peCanvas||!peJobId||!pePlanId){ toast('Nothing to save'); return; }
+  const btn=document.getElementById('pe-save-btn');
+  btn.disabled=true; btn.textContent='Saving...';
+  // Draw legend onto canvas before saving
+  if(peLegendData.filter(l=>l.label).length) peDrawLegendOnCanvas();
+  pePushHistory();
+  try{
+    const blob=await new Promise(res=>peCanvas.toBlob(res,'image/png'));
+    const signData=await api('POST','/upload-sign',{folder:'warehouse/'+peJobId+'/markups'});
+    const fd=new FormData();
+    fd.append('file',blob,'markup.png');
+    fd.append('upload_preset',signData.upload_preset);
+    fd.append('folder',signData.folder);
+    const r=await fetch('https://api.cloudinary.com/v1_1/'+CL_CLOUD+'/image/upload',{method:'POST',body:fd});
+    const d=await r.json();
+    if(d.error) throw new Error(d.error.message);
+    await api('PUT','/jobs/'+peJobId+'/plans/'+pePlanId,{markup_url:d.secure_url,markup_public_id:d.public_id});
+    toast('Saved!');
+    btn.disabled=false; btn.textContent='💾 Save';
+  }catch(e){
+    toast('Save error: '+e.message,4000);
+    btn.disabled=false; btn.textContent='💾 Save';
+  }
+}
+
+// ── DOWNLOAD ─────────────────────────────────────────────────────────────────
+async function peDownload(){
+  if(!peCanvas){ toast('No plan loaded'); return; }
+  // Draw legend if any
+  if(peLegendData.filter(l=>l.label).length) peDrawLegendOnCanvas();
+  const a=document.createElement('a');
+  a.href=peCanvas.toDataURL('image/png');
+  a.download=(pePlanRecord?.name||'plan')+'_markup.png';
+  a.click();
+  toast('Downloaded');
+}
+
+
+// ── JOB DETAIL TABS ──────────────────────────────────────────────────────────
 const phaseLabels={not_started:'Not Started',rough_in:'Rough-in',trim_out:'Trim-out',inspection:'Inspection',complete:'Complete',on_hold:'On Hold'};
 const phaseColors={not_started:'var(--text3)',rough_in:'var(--amber-t)',trim_out:'var(--blue-t)',inspection:'var(--purple-t)',complete:'var(--green-t)',on_hold:'var(--red-t)'};
+
 function renderJobs(){
   const q=(document.getElementById('j-search')?.value||'').toLowerCase();
   const showArch=document.getElementById('j-arch')?.checked;
@@ -751,7 +928,6 @@ function renderJobs(){
 function showJob(id){hideEl('jl-view');showEl('jd-view');openJobDetail(id,'profile');}
 function backJobs(){showEl('jl-view');hideEl('jd-view');renderJobs();}
 
-// JOB DETAIL
 async function openJobDetail(jobId,tab){
   let j=jobs[jobId];
   if(!j){try{j=await api('GET','/jobs/'+jobId);jobs[j.id]=j;}catch(e){toast('Job not found');return;}}
@@ -770,7 +946,7 @@ async function openJobDetail(jobId,tab){
     <div id="jd-tab"></div>`;
   const el=document.getElementById('jd-tab');
   if(tab==='profile')await renderJobProfile(jobId,el);
-  else if(tab==='walk')renderJobWalk(jobId,el);
+  else if(tab==='walk')await renderJobWalk(jobId,el);
   else if(tab==='schedule')renderJobSchedule(jobId,el);
   else if(tab==='parts')await renderJobParts(jobId,el);
   else if(tab==='attendance')await renderJobAttendance(jobId,el);
@@ -824,16 +1000,39 @@ async function saveProfile(jobId){
   try{const j2=await api('PUT','/jobs/'+jobId,upd);jobs[jobId]={...jobs[jobId],...j2};openJobDetail(jobId,'profile');toast('Saved');}catch(e){toast(e.message);}
 }
 
-// JOB WALK TAB
-function renderJobWalk(jobId,el){
+// JOB WALK — now with plan uploads
+async function renderJobWalk(jobId,el){
   const j=jobs[jobId];const canEdit=['admin','stager','foreman','technician'].includes(CU?.role);
+  // Load walk plans
+  let walkPlans=[];
+  try{const all=await api('GET','/jobs/'+jobId+'/plans');walkPlans=all.filter(p=>p.plan_type==='walk');}catch(e){}
+  const planCards=walkPlans.map(pl=>{
+    const markupTarget=pl.thumb_url||pl.url;
+    const thumb=pl.thumb_url?'<img src="'+pl.thumb_url+'" style="width:100%;border-radius:6px;margin:6px 0;object-fit:cover;max-height:160px" onerror="this.style.display=\'none\'"/>':'';
+    return'<div class="plan-card">'+thumb+'<div style="font-size:13px;font-weight:600">'+(pl.name||'Walk Plan')+'</div><div class="pa">'+fmtDate(pl.created_at)+'</div>'
+      +'<div class="plan-actions">'
+      +'<button class="btn btn-sm btn-b" onclick="viewPDF(\''+pl.url+'\')">&#128196; View</button>'
+      +'<button class="btn btn-sm btn-t" onclick="peOpen(\''+jobId+'\','+JSON.stringify(pl).replace(/'/g,"\\'")+',\''+markupTarget+'\',\''+(pl.markup_url||'')+'\')">&#9998; Markup</button>'
+      +(pl.markup_url?'<button class="btn btn-sm" onclick="window.open(\''+pl.markup_url+'\',\'_blank\')">View Markup</button>':'')
+      +'<button class="btn btn-sm btn-d" onclick="deletePlan(\''+jobId+'\',\''+pl.id+'\',\'walk\')">Delete</button>'
+      +'</div></div>';
+  }).join('');
+
   if(canEdit){
     el.innerHTML=`
       <div class="fl nt">Who did the job walk</div><input type="text" id="jw-by" value="${j.job_walk_by||''}" placeholder="Name" style="margin-bottom:8px"/>
       <div class="fl">Job walk date</div><input type="date" id="jw-date" value="${j.job_walk_date||''}" style="margin-bottom:8px"/>
-      <div class="fl">Job walk notes</div><textarea id="jw-notes" placeholder="Observations, conditions, measurements, existing conditions..." style="margin-bottom:8px">${j.job_walk_notes||''}</textarea>
-      <div class="fl">Install notes for crew</div><textarea id="jw-inst" placeholder="Instructions, warnings, special requirements for the install crew..." style="margin-bottom:10px">${j.install_notes||''}</textarea>
-      <button class="btn btn-p" onclick="saveJobWalk('${jobId}')">Save</button>`;
+      <div class="fl">Job walk notes</div><textarea id="jw-notes" placeholder="Observations, conditions, measurements..." style="margin-bottom:8px">${j.job_walk_notes||''}</textarea>
+      <div class="fl">Install notes for crew</div><textarea id="jw-inst" placeholder="Instructions, warnings, special requirements..." style="margin-bottom:10px">${j.install_notes||''}</textarea>
+      <button class="btn btn-p" onclick="saveJobWalk('${jobId}')" style="margin-bottom:14px">Save</button>
+      <div class="divider"></div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:8px">Walk Plans</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input type="text" id="walkplan-name" placeholder="Plan name (optional)" style="flex:1;margin-bottom:0"/>
+        <label class="btn btn-b btn-sm" style="text-align:center;cursor:pointer;flex-shrink:0">&#128196; Upload<input type="file" accept=".pdf,image/*" style="display:none" onchange="uploadWalkPlan(this,'${jobId}')"></label>
+      </div>
+      <div id="walkplan-progress" style="display:none"><div class="upload-progress"><div class="upload-progress-bar" id="walkplan-prog-bar" style="width:0%"></div></div></div>
+      ${planCards||'<div class="empty" style="padding:1rem 0">No walk plans uploaded yet</div>'}`;
   }else{
     el.innerHTML=`
       <div class="card" style="margin-bottom:10px">
@@ -841,12 +1040,33 @@ function renderJobWalk(jobId,el){
         <div class="prow" style="padding:5px 0;border-bottom:none"><div class="pi"><div class="pn">Walk date</div><div class="pid">${fmtDate(j.job_walk_date)||'--'}</div></div></div>
       </div>
       ${j.job_walk_notes?'<div class="sec" style="margin-top:0">Job Walk Notes</div><div class="card" style="font-size:14px;line-height:1.6;white-space:pre-wrap;margin-bottom:10px">'+j.job_walk_notes+'</div>':''}
-      ${j.install_notes?'<div class="sec" style="margin-top:0">Install Notes for Crew</div><div class="card" style="font-size:14px;line-height:1.6;white-space:pre-wrap;background:var(--amber-bg);border-color:var(--amber-b)">'+j.install_notes+'</div>':'<div class="empty">No install notes yet</div>'}`;
+      ${j.install_notes?'<div class="sec" style="margin-top:0">Install Notes for Crew</div><div class="card" style="font-size:14px;line-height:1.6;white-space:pre-wrap;background:var(--amber-bg);border-color:var(--amber-b)">'+j.install_notes+'</div>':'<div class="empty">No install notes yet</div>'}
+      ${walkPlans.length?'<div class="sec" style="margin-top:12px">Walk Plans</div>'+planCards:''}`;
   }
 }
 async function saveJobWalk(jobId){
   const upd={job_walk_by:document.getElementById('jw-by').value.trim(),job_walk_date:document.getElementById('jw-date').value||null,job_walk_notes:document.getElementById('jw-notes').value.trim(),install_notes:document.getElementById('jw-inst').value.trim()};
-  try{const j2=await api('PUT','/jobs/'+jobId,upd);jobs[jobId]={...jobs[jobId],...j2};toast('Saved');openJobDetail(jobId,'walk');}catch(e){toast(e.message);}
+  try{const j2=await api('PUT','/jobs/'+jobId,upd);jobs[jobId]={...jobs[jobId],...j2};toast('Saved');}catch(e){toast(e.message);}
+}
+async function uploadWalkPlan(input,jobId){
+  const file=input.files[0];if(!file)return;
+  const name=document.getElementById('walkplan-name')?.value.trim()||file.name.replace(/\.[^.]+$/,'');
+  const isPDF=file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf');
+  showEl('walkplan-progress');
+  const bar=document.getElementById('walkplan-prog-bar');bar.style.width='20%';
+  try{
+    const signData=await api('POST','/upload-sign',{folder:'warehouse/'+jobId+'/walkplans'});
+    bar.style.width='50%';
+    const fd=new FormData();fd.append('file',file);fd.append('upload_preset',signData.upload_preset);fd.append('folder',signData.folder);
+    const resourceType=isPDF?'raw':'image';
+    const r=await fetch('https://api.cloudinary.com/v1_1/'+CL_CLOUD+'/'+resourceType+'/upload',{method:'POST',body:fd});
+    const d=await r.json();if(d.error)throw new Error(d.error.message);
+    bar.style.width='85%';
+    let thumbUrl=isPDF&&d.public_id?'https://res.cloudinary.com/'+CL_CLOUD+'/image/upload/'+d.public_id+'.jpg':'';
+    await api('POST','/jobs/'+jobId+'/plans',{url:d.secure_url,public_id:d.public_id,name,thumb_url:thumbUrl,plan_type:'walk'});
+    bar.style.width='100%';setTimeout(()=>hideEl('walkplan-progress'),1000);
+    input.value='';openJobDetail(jobId,'walk');toast('Uploaded: '+name);
+  }catch(e){hideEl('walkplan-progress');toast('Upload error: '+e.message,4000);}
 }
 
 function renderJobSchedule(jobId,el){
@@ -874,7 +1094,7 @@ function renderJobStatus(jobId,el){
 async function saveStatus(jobId){const phase=document.getElementById('st-phase')?.value;const pct=parseInt(document.getElementById('st-pct')?.value)||0;try{const j2=await api('PUT','/jobs/'+jobId,{phase,pct_complete:pct});jobs[jobId]={...jobs[jobId],...j2};toast('Status saved');openJobDetail(jobId,'status');}catch(e){toast(e.message);}}
 async function archiveJob(jobId,arch){try{const j2=await api('PUT','/jobs/'+jobId,{archived:arch});jobs[jobId]={...jobs[jobId],...j2};openJobDetail(jobId,'status');toast(arch?'Archived':'Unarchived');}catch(e){toast(e.message);}}
 
-// ATTENDANCE TAB
+// ATTENDANCE
 async function renderJobAttendance(jobId,el){
   try{
     const att=await api('GET','/jobs/'+jobId+'/attendance');
@@ -885,9 +1105,7 @@ async function renderJobAttendance(jobId,el){
       <div class="${signedInHere?'signin-box signin-active':'signin-box signin-inactive'}">
         <div style="font-size:28px">${signedInHere?'\u{1F7E2}':'\u26AA'}</div>
         <div style="flex:1"><div style="font-size:15px;font-weight:600">${signedInHere?'You are signed in':'You are not signed in'}</div><div class="pa">${signedInHere?'Signed in at '+fmtDateTime(signedInHere.sign_in_at):'Tap to sign in when you arrive'}</div></div>
-        ${signedInHere
-          ?'<button class="btn btn-sm btn-d" onclick="siteSignOut(\''+jobId+'\')">Sign Out</button>'
-          :'<button class="btn btn-sm btn-g" onclick="siteSignIn(\''+jobId+'\')">Sign In</button>'}
+        ${signedInHere?'<button class="btn btn-sm btn-d" onclick="siteSignOut(\''+jobId+'\')">Sign Out</button>':'<button class="btn btn-sm btn-g" onclick="siteSignIn(\''+jobId+'\')">Sign In</button>'}
       </div>
       <div class="sec" style="margin-top:4px">Currently on site (${onSite.length})</div>
       ${onSite.length?onSite.map(a=>`<div class="att-row"><div class="att-dot att-active"></div><div style="flex:1"><div style="font-size:13px;font-weight:500">${a.user_name}<span class="role-badge role-${a.user_role}" style="margin-left:6px">${a.user_role}</span></div><div class="pa">Signed in ${fmtDateTime(a.sign_in_at)}</div></div></div>`).join(''):'<div class="empty" style="padding:.8rem 0">Nobody signed in</div>'}
@@ -898,6 +1116,7 @@ async function renderJobAttendance(jobId,el){
 async function siteSignIn(jobId){try{await api('POST','/jobs/'+jobId+'/attendance',{action:'signin'});openJobDetail(jobId,'attendance');toast('Signed in!');}catch(e){toast(e.message);}}
 async function siteSignOut(jobId){try{const r=await api('POST','/jobs/'+jobId+'/attendance',{action:'signout'});openJobDetail(jobId,'attendance');toast('Signed out \u00b7 '+r.hours+' hrs');}catch(e){toast(e.message);}}
 
+// PARTS
 async function renderJobParts(jobId,el){
   try{
     const parts=await api('GET','/jobs/'+jobId+'/parts');const mf=await api('GET','/jobs/'+jobId+'/manifest');
@@ -923,12 +1142,14 @@ async function returnPart(jobId,partId){try{await api('POST','/jobs/'+jobId+'/pa
 async function retAll(jobId){const parts=await api('GET','/jobs/'+jobId+'/parts').catch(()=>[]);const staged=parts.filter(p=>p.status==='staged');for(const p of staged){try{await api('POST','/jobs/'+jobId+'/parts/'+p.id+'/return');}catch(e){}}openJobDetail(jobId,'parts');toast('Returned '+staged.length);}
 async function addToMf(jobId){const bc=document.getElementById('jdp-bc')?.value.trim();if(!bc){toast('Enter barcode');return;}const qty=parseInt(document.getElementById('jdp-qty')?.value.trim())||1;const p=lookup(bc);const nm=p?p.name:bc;try{await api('POST','/jobs/'+jobId+'/manifest',{partId:p?p.barcode:bc,part_name:nm,expectedQty:qty});openJobDetail(jobId,'parts');toast('Added: '+nm);}catch(e){toast('Error: '+e.message);}}
 
+// LOGS
 async function renderJobLogs(jobId,el){
   const logs=await api('GET','/jobs/'+jobId+'/logs').catch(()=>[]);
   el.innerHTML=`<div class="fl nt">Add entry</div><select id="log-type" style="margin-bottom:8px"><option value="note">Daily Note</option><option value="gc_communication">GC Communication</option><option value="progress">Progress Update</option><option value="issue">Issue / Concern</option></select><textarea id="log-content" placeholder="Enter notes..." style="margin-bottom:8px"></textarea><button class="btn btn-p" onclick="addLog('${jobId}')" style="margin-bottom:14px">Add Entry</button><div class="sec" style="margin-top:0">Log History</div>${logs.length?logs.map(l=>{const tc={note:'var(--text2)',gc_communication:'var(--blue-t)',progress:'var(--green-t)',issue:'var(--red-t)'};const tl={note:'Note',gc_communication:'GC Comm',progress:'Progress',issue:'Issue'};return'<div class="prow"><div class="pi"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--bg2);color:'+(tc[l.type]||'var(--text2)')+'">'+( tl[l.type]||l.type)+'</span><span class="pa">'+l.author+' \u00b7 '+fmtDate(l.created_at)+'</span></div><div style="font-size:14px;line-height:1.6;white-space:pre-wrap">'+l.content+'</div></div></div>';}).join(''):'<div class="empty">No entries yet</div>'}`;
 }
 async function addLog(jobId){const content=document.getElementById('log-content')?.value.trim();const type=document.getElementById('log-type')?.value||'note';if(!content){toast('Enter content');return;}try{await api('POST','/jobs/'+jobId+'/logs',{content,type});openJobDetail(jobId,'logs');toast('Entry added');}catch(e){toast(e.message);}}
 
+// GC ALERTS
 async function renderJobAlerts(jobId,el){
   const alerts=await api('GET','/jobs/'+jobId+'/alerts').catch(()=>[]);
   el.innerHTML=`<div class="fl nt">New GC Alert</div><input type="text" id="al-title" placeholder="Alert title / RFI / issue" style="margin-bottom:8px"/><textarea id="al-desc" placeholder="Details..." style="margin-bottom:8px"></textarea><select id="al-priority" style="margin-bottom:10px"><option value="normal">Normal</option><option value="urgent">Urgent</option><option value="critical">Critical</option></select><button class="btn btn-d" onclick="addAlert('${jobId}')" style="margin-bottom:14px">Submit Alert</button><div class="sec" style="margin-top:0">Open Alerts</div>${alerts.filter(a=>a.status==='open').length?alerts.filter(a=>a.status==='open').map(a=>`<div class="prow"><div class="pi"><div class="pid">${a.title}<span class="badge ${a.priority==='critical'?'b-over':a.priority==='urgent'?'b-pending':''}">${a.priority}</span></div>${a.description?'<div class="pn" style="white-space:pre-wrap">'+a.description+'</div>':''}<div class="pa">${a.created_by} \u00b7 ${fmtDate(a.created_at)}</div></div><button class="btn btn-sm btn-g" onclick="resolveAlert('${jobId}','${a.id}')">Resolve</button></div>`).join(''):'<div class="empty">No open alerts</div>'}${alerts.filter(a=>a.status==='resolved').length?'<div class="sec">Resolved</div>'+alerts.filter(a=>a.status==='resolved').map(a=>`<div class="prow"><div class="pi"><div class="pid" style="text-decoration:line-through;opacity:.6">${a.title}</div><div class="pa">${a.created_by} \u00b7 ${fmtDate(a.created_at)}</div></div></div>`).join(''):''}`;
@@ -936,6 +1157,7 @@ async function renderJobAlerts(jobId,el){
 async function addAlert(jobId){const title=document.getElementById('al-title')?.value.trim();if(!title){toast('Enter a title');return;}const desc=document.getElementById('al-desc')?.value.trim();const priority=document.getElementById('al-priority')?.value||'normal';try{await api('POST','/jobs/'+jobId+'/alerts',{title,description:desc,priority});openJobDetail(jobId,'alerts');toast('Alert submitted');}catch(e){toast(e.message);}}
 async function resolveAlert(jobId,alertId){try{await api('PUT','/jobs/'+jobId+'/alerts/'+alertId,{status:'resolved',resolved_at:new Date().toISOString()});openJobDetail(jobId,'alerts');toast('Resolved');}catch(e){toast(e.message);}}
 
+// PART REQUESTS
 async function renderJobRequests(jobId,el){
   const reqs=await api('GET','/jobs/'+jobId+'/requests').catch(()=>[]);const canApprove=['admin','foreman'].includes(CU?.role);
   el.innerHTML=`<div class="fl nt">Request a part</div><input type="text" id="req-pn" placeholder="Part name or barcode" style="margin-bottom:8px"/><input type="text" id="req-qty" placeholder="Qty needed" style="margin-bottom:8px"/><textarea id="req-reason" placeholder="Why needed, urgency..." style="margin-bottom:10px"></textarea><button class="btn btn-w" onclick="addRequest('${jobId}')" style="margin-bottom:14px">Submit Request</button><div class="sec" style="margin-top:0">Requests</div>${reqs.length?reqs.map(r=>`<div class="prow"><div class="pi"><div class="pid">${r.part_name||r.part_id}<span class="badge ${r.status==='approved'?'b-inst':r.status==='rejected'?'b-over':'b-pending'}">${r.status}</span></div><div class="pn">Qty: ${r.qty} \u00b7 ${r.created_by} \u00b7 ${fmtDate(r.created_at)}</div>${r.reason?'<div class="pa">'+r.reason+'</div>':''}${r.approved_by?'<div class="pa" style="color:var(--green-t)">Approved by '+r.approved_by+'</div>':''}</div>${canApprove&&r.status==='pending'?'<div style="display:flex;flex-direction:column;gap:4px"><button class="btn btn-sm btn-g" onclick="updateReq(\''+jobId+'\',\''+r.id+'\',\'approved\')">Approve</button><button class="btn btn-sm btn-d" onclick="updateReq(\''+jobId+'\',\''+r.id+'\',\'rejected\')">Reject</button></div>':''}</div>`).join(''):'<div class="empty">No requests yet</div>'}`;
@@ -943,6 +1165,7 @@ async function renderJobRequests(jobId,el){
 async function addRequest(jobId){const pn=document.getElementById('req-pn')?.value.trim();if(!pn){toast('Enter part name');return;}const p=lookup(pn);const qty=parseInt(document.getElementById('req-qty')?.value.trim())||1;const reason=document.getElementById('req-reason')?.value.trim();try{await api('POST','/jobs/'+jobId+'/requests',{part_id:p?p.barcode:pn,part_name:p?p.name:pn,qty,reason});openJobDetail(jobId,'requests');toast('Request submitted');}catch(e){toast(e.message);}}
 async function updateReq(jobId,reqId,status){try{await api('PUT','/jobs/'+jobId+'/requests/'+reqId,{status});openJobDetail(jobId,'requests');toast(status);}catch(e){toast(e.message);}}
 
+// PHOTOS
 async function renderJobPhotos(jobId,el){
   const photos=await api('GET','/jobs/'+jobId+'/photos').catch(()=>[]);
   el.innerHTML=`<div class="fl nt">Add photos</div><label class="btn btn-b" style="text-align:center;cursor:pointer;margin-bottom:8px;display:block">&#128247; Take photo / Upload<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="uploadPhotos(this,'${jobId}')"></label><div id="ph-progress" style="display:none"><div class="upload-progress"><div class="upload-progress-bar" id="ph-prog-bar" style="width:0%"></div></div><div style="font-size:12px;color:var(--text2);text-align:center;margin-top:4px" id="ph-prog-txt">Uploading...</div></div><div style="font-size:13px;font-weight:600;margin-bottom:8px">Photos (${photos.length})</div><div class="photo-grid">${photos.map(p=>`<div class="photo-thumb"><img src="${p.url}" loading="lazy" onclick="window.open('${p.url}','_blank')"/>${p.caption?'<div class="ph-cap">'+p.caption+'</div>':''}<button class="del-ph" onclick="deletePhoto('${jobId}','${p.id}')">&#215;</button></div>`).join('')}</div>${!photos.length?'<div class="empty">No photos yet</div>':''}`;
@@ -958,79 +1181,46 @@ async function uploadPhotos(input,jobId){
 }
 async function deletePhoto(jobId,photoId){if(!confirm('Delete?'))return;try{await api('DELETE','/jobs/'+jobId+'/photos/'+photoId);openJobDetail(jobId,'photos');toast('Deleted');}catch(e){toast(e.message);}}
 
+// PLANS TAB
+function viewPDF(url){window.open(url,'_blank','noopener');}
 async function renderJobPlans(jobId,el){
-  const plans=await api('GET','/jobs/'+jobId+'/plans').catch(()=>[]);
-  el.innerHTML=`<div class="fl nt">Upload plan (PDF or image)</div><div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" id="plan-name" placeholder="Plan name e.g. Floor Plan Rev B" style="flex:1;margin-bottom:0"/><label class="btn btn-b btn-sm" style="text-align:center;cursor:pointer;flex-shrink:0">Upload<input type="file" accept=".pdf,image/*" style="display:none" onchange="uploadPlan(this,'${jobId}')"></label></div><div id="plan-progress" style="display:none"><div class="upload-progress"><div class="upload-progress-bar" id="plan-prog-bar" style="width:0%"></div></div></div><div class="sec" style="margin-top:8px">Plans (${plans.length})</div>${plans.map(pl=>`<div class="plan-card"><div style="font-size:14px;font-weight:600">${pl.name||'Plan'}</div><div class="pa">Uploaded by ${pl.uploaded_by} \u00b7 ${fmtDate(pl.created_at)}</div>${pl.notes?'<div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.5">'+pl.notes+'</div>':''}<div class="plan-actions"><button class="btn btn-sm btn-b" onclick="window.open('${pl.url}','_blank')">View PDF</button><button class="btn btn-sm btn-t" onclick="openMarkup('${jobId}','${pl.id}','${pl.url}','${(pl.name||'Plan').replace(/'/g,'')}','${pl.markup_url||''}','${(pl.notes||'').replace(/'/g,'').replace(/\n/g,' ')}')">Markup</button>${pl.markup_url?'<button class="btn btn-sm" onclick="window.open(\''+pl.markup_url+'\',\'_blank\')">View Markup</button>':''}<button class="btn btn-sm btn-d" onclick="deletePlan(\'${jobId}\',\'${pl.id}\')">Delete</button></div></div>`).join('')}${!plans.length?'<div class="empty">No plans uploaded yet</div>':''}`;
+  const allPlans=await api('GET','/jobs/'+jobId+'/plans').catch(()=>[]);
+  const plans=allPlans.filter(p=>!p.plan_type||p.plan_type==='plans');
+  const planCards=plans.map(pl=>{
+    const isPDF=pl.url&&(pl.url.includes('/raw/upload/')||pl.url.toLowerCase().endsWith('.pdf'));
+    const markupTarget=pl.thumb_url||pl.url;
+    const thumb=pl.thumb_url?'<img src="'+pl.thumb_url+'" style="width:100%;border-radius:6px;margin:8px 0;object-fit:cover;max-height:180px;cursor:pointer;background:var(--bg3)" onclick="window.open(\''+pl.url+'\',\'_blank\')" onerror="this.style.display=\'none\'"/>':'';
+    const viewBtn=isPDF?'<button class="btn btn-sm btn-b" onclick="viewPDF(\''+pl.url+'\')">&#128196; View PDF</button>':'<button class="btn btn-sm btn-b" onclick="window.open(\''+pl.url+'\',\'_blank\')">&#128247; View</button>';
+    return'<div class="plan-card">'+thumb+'<div style="font-size:14px;font-weight:600">'+(pl.name||'Plan')+'</div><div class="pa">Uploaded by '+pl.uploaded_by+' \u00b7 '+fmtDate(pl.created_at)+'</div>'+(pl.notes?'<div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.5">'+pl.notes+'</div>':'')+'<div class="plan-actions">'+viewBtn+'<button class="btn btn-sm btn-t" onclick="peOpen(\''+jobId+'\','+JSON.stringify(pl).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+',\''+markupTarget.replace(/'/g,"\\'")+'\',\''+(pl.markup_url||'')+'\')">&#9998; Markup</button>'+(pl.markup_url?'<button class="btn btn-sm" onclick="window.open(\''+pl.markup_url+'\',\'_blank\')">View Markup</button>':'')+'<button class="btn btn-sm btn-d" onclick="deletePlan(\''+jobId+'\',\''+pl.id+'\')">Delete</button></div></div>';
+  }).join('');
+  el.innerHTML='<div class="fl nt">Upload plan (PDF or image)</div><div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" id="plan-name" placeholder="Plan name e.g. Floor Plan Rev B" style="flex:1;margin-bottom:0"/><label class="btn btn-b btn-sm" style="text-align:center;cursor:pointer;flex-shrink:0">Upload<input type="file" accept=".pdf,image/*" style="display:none" onchange="uploadPlan(this,\''+jobId+'\')"></label></div><div id="plan-progress" style="display:none"><div class="upload-progress"><div class="upload-progress-bar" id="plan-prog-bar" style="width:0%"></div></div><div style="font-size:12px;color:var(--text2);text-align:center;margin-top:4px" id="plan-prog-txt">Uploading...</div></div><div class="sec" style="margin-top:8px">Plans ('+plans.length+')</div>'+planCards+(plans.length?'':'<div class="empty">No plans uploaded yet</div>');
 }
 async function uploadPlan(input,jobId){
   const file=input.files[0];if(!file)return;
   const name=document.getElementById('plan-name')?.value.trim()||file.name.replace(/\.[^.]+$/,'');
-  showEl('plan-progress');document.getElementById('plan-prog-bar').style.width='30%';
+  const isPDF=file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf');
+  showEl('plan-progress');
+  const bar=document.getElementById('plan-prog-bar');const txt=document.getElementById('plan-prog-txt');
+  bar.style.width='20%';if(txt)txt.textContent='Uploading...';
   try{
     const signData=await api('POST','/upload-sign',{folder:'warehouse/'+jobId+'/plans'});
-    document.getElementById('plan-prog-bar').style.width='60%';
+    bar.style.width='50%';
     const fd=new FormData();fd.append('file',file);fd.append('upload_preset',signData.upload_preset);fd.append('folder',signData.folder);
-    // For PDFs use image upload type with page option to get preview image
-    const isPDF=file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf');
-    const uploadUrl='https://api.cloudinary.com/v1_1/'+CL_CLOUD+'/'+(isPDF?'image':'image')+'/upload';
-    const r=await fetch(uploadUrl,{method:'POST',body:fd});const d=await r.json();
-    document.getElementById('plan-prog-bar').style.width='90%';
-    // For PDFs, create a viewable image URL from the uploaded resource
-    let viewUrl=d.secure_url;
-    if(isPDF&&d.public_id){viewUrl='https://res.cloudinary.com/'+CL_CLOUD+'/image/upload/'+d.public_id+'.jpg';}
-    await api('POST','/jobs/'+jobId+'/plans',{url:d.secure_url,public_id:d.public_id,name,thumb_url:viewUrl});
-    document.getElementById('plan-prog-bar').style.width='100%';setTimeout(()=>hideEl('plan-progress'),1000);
-    openJobDetail(jobId,'plans');if(document.getElementById('plan-name'))document.getElementById('plan-name').value='';input.value='';toast('Plan uploaded');
-  }catch(e){hideEl('plan-progress');toast('Upload error: '+e.message);}
+    const resourceType=isPDF?'raw':'image';
+    const r=await fetch('https://api.cloudinary.com/v1_1/'+CL_CLOUD+'/'+resourceType+'/upload',{method:'POST',body:fd});
+    const d=await r.json();if(d.error)throw new Error(d.error.message);
+    bar.style.width='85%';
+    let thumbUrl=isPDF&&d.public_id?'https://res.cloudinary.com/'+CL_CLOUD+'/image/upload/'+d.public_id+'.jpg':'';
+    await api('POST','/jobs/'+jobId+'/plans',{url:d.secure_url,public_id:d.public_id,name,thumb_url:thumbUrl,plan_type:'plans'});
+    bar.style.width='100%';if(txt)txt.textContent='Done!';setTimeout(()=>hideEl('plan-progress'),1200);
+    openJobDetail(jobId,'plans');const pn=document.getElementById('plan-name');if(pn)pn.value='';input.value='';toast('Plan uploaded');
+  }catch(e){hideEl('plan-progress');toast('Upload error: '+e.message,4000);}
 }
-async function deletePlan(jobId,planId){if(!confirm('Delete plan?'))return;try{await api('DELETE','/jobs/'+jobId+'/plans/'+planId);openJobDetail(jobId,'plans');toast('Deleted');}catch(e){toast(e.message);}}
+async function deletePlan(jobId,planId,returnTab){
+  if(!confirm('Delete plan?'))return;
+  try{await api('DELETE','/jobs/'+jobId+'/plans/'+planId);openJobDetail(jobId,returnTab||'plans');toast('Deleted');}catch(e){toast(e.message);}
+}
 
-// MARKUP
-function openMarkup(jobId,planId,planUrl,planName,markupUrl,existingNotes){
-  currentMarkupPlan={id:planId,url:planUrl};currentMarkupJobId=jobId;
-  document.getElementById('markup-title').textContent=planName;document.getElementById('markup-notes').value=existingNotes||'';
-  showEl('markup-modal');
-  const canvas=document.getElementById('markup-canvas');markupCanvas=canvas;markupCtx=canvas.getContext('2d');markupImg=null;
-  const isPDF=planUrl.includes('.pdf')||planUrl.toLowerCase().includes('.pdf');
-  if(isPDF){
-    // Convert PDF page 1 to canvas using PDF.js
-    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    pdfjsLib.getDocument(planUrl).promise.then(pdf=>pdf.getPage(1)).then(page=>{
-      const vp=page.getViewport({scale:1.5});canvas.width=vp.width;canvas.height=vp.height;
-      page.render({canvasContext:markupCtx,viewport:vp}).promise.then(()=>{if(markupUrl)loadMarkupOverlay(markupUrl);setupDrawing();});
-    }).catch(()=>{
-      // PDF.js failed, try loading as image (Cloudinary PDF->image conversion)
-      const img=new Image();img.crossOrigin='anonymous';
-      img.onload=()=>{canvas.width=img.width;canvas.height=img.height;markupCtx.drawImage(img,0,0);markupImg=img;if(markupUrl)loadMarkupOverlay(markupUrl);setupDrawing();};
-      img.onerror=()=>toast('Could not load plan for markup. Try uploading as an image instead.');
-      img.src=planUrl.replace('.pdf','.jpg').replace('/raw/upload/','/image/upload/');
-    });
-  }else{
-    const img=new Image();img.crossOrigin='anonymous';
-    img.onload=()=>{canvas.width=img.width;canvas.height=img.height;markupCtx.drawImage(img,0,0);markupImg=img;if(markupUrl)loadMarkupOverlay(markupUrl);setupDrawing();};
-    img.onerror=()=>toast('Could not load image');img.src=planUrl;
-  }
-}
-function loadMarkupOverlay(url){const m=new Image();m.crossOrigin='anonymous';m.onload=()=>markupCtx.drawImage(m,0,0,markupCanvas.width,markupCanvas.height);m.src=url;}
-function setupDrawing(){
-  const c=markupCanvas;
-  c.onmousedown=e=>{markupDrawing=true;markupCtx.beginPath();const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;markupCtx.moveTo((e.clientX-r.left)*sx,(e.clientY-r.top)*sy);};
-  c.onmousemove=e=>{if(!markupDrawing)return;const r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;markupCtx.lineWidth=drawSize;markupCtx.strokeStyle=drawColor;markupCtx.lineCap='round';markupCtx.lineTo((e.clientX-r.left)*sx,(e.clientY-r.top)*sy);markupCtx.stroke();};
-  c.onmouseup=()=>{markupDrawing=false;};
-  c.ontouchstart=e=>{e.preventDefault();markupDrawing=true;markupCtx.beginPath();const r=c.getBoundingClientRect(),t=e.touches[0],sx=c.width/r.width,sy=c.height/r.height;markupCtx.moveTo((t.clientX-r.left)*sx,(t.clientY-r.top)*sy);};
-  c.ontouchmove=e=>{e.preventDefault();if(!markupDrawing)return;const r=c.getBoundingClientRect(),t=e.touches[0],sx=c.width/r.width,sy=c.height/r.height;markupCtx.lineWidth=drawSize;markupCtx.strokeStyle=drawColor;markupCtx.lineCap='round';markupCtx.lineTo((t.clientX-r.left)*sx,(t.clientY-r.top)*sy);markupCtx.stroke();};
-  c.ontouchend=()=>{markupDrawing=false;};
-}
-function setDrawColor(c,el){drawColor=c;document.querySelectorAll('.color-dot').forEach(d=>d.classList.remove('active'));el.classList.add('active');}
-function clearMarkup(){if(!markupCanvas)return;markupCtx.clearRect(0,0,markupCanvas.width,markupCanvas.height);if(markupImg)markupCtx.drawImage(markupImg,0,0);}
-document.getElementById('brush-size').addEventListener('input',e=>{drawSize=parseInt(e.target.value);});
-async function saveMarkup(){
-  if(!markupCanvas||!currentMarkupPlan)return;toast('Saving...');
-  markupCanvas.toBlob(async blob=>{
-    try{const signData=await api('POST','/upload-sign',{folder:'warehouse/'+currentMarkupJobId+'/markups'});const fd=new FormData();fd.append('file',blob,'markup.png');fd.append('upload_preset',signData.upload_preset);fd.append('folder',signData.folder);const r=await fetch('https://api.cloudinary.com/v1_1/'+CL_CLOUD+'/image/upload',{method:'POST',body:fd});const d=await r.json();await api('PUT','/jobs/'+currentMarkupJobId+'/plans/'+currentMarkupPlan.id,{markup_url:d.secure_url,markup_public_id:d.public_id});toast('Markup saved');}catch(e){toast('Save error: '+e.message);}
-  },'image/png');
-}
-async function saveMarkupAndNotes(){const notes=document.getElementById('markup-notes')?.value.trim()||'';try{await api('PUT','/jobs/'+currentMarkupJobId+'/plans/'+currentMarkupPlan.id,{notes});}catch(e){}await saveMarkup();hideEl('markup-modal');openJobDetail(currentMarkupJobId,'plans');}
 
 // JOB FINANCIALS TAB
 function fmtMoney(v){return v==null?'--':'$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}

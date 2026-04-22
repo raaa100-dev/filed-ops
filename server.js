@@ -455,9 +455,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (plM && method === 'POST') {
     const u = await getUser(req); if (!requireAuth(res,u)) return;
-    const {url:planUrl, public_id, name, thumb_url} = await readBody(req);
+    const {url:planUrl, public_id, name, thumb_url, plan_type} = await readBody(req);
     if (!planUrl) return json(res, 400, {error:'url required'});
-    try { return json(res, 201, (await dbInsert('job_plans', {id:'pl'+Date.now(), job_id:plM[1], name:name||'Plan', url:planUrl, public_id:public_id||'', thumb_url:thumb_url||'', notes:'', uploaded_by:u.name, created_at:nowISO()}))[0]); } catch(e) { return json(res, 500, {error:e.message}); }
+    try { return json(res, 201, (await dbInsert('job_plans', {id:'pl'+Date.now(), job_id:plM[1], name:name||'Plan', url:planUrl, public_id:public_id||'', thumb_url:thumb_url||'', plan_type:plan_type||'plans', notes:'', uploaded_by:u.name, created_at:nowISO()}))[0]); } catch(e) { return json(res, 500, {error:e.message}); }
   }
   const plIM = p.match(/^\/api\/jobs\/([^/]+)\/plans\/([^/]+)$/);
   if (plIM && method === 'PUT') {

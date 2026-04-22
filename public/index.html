@@ -1223,7 +1223,7 @@ function renderJobs(){
     ${j.date_next_visit?'<div class="pa">Next visit: '+fmtDate(j.date_next_visit)+'</div>':''}
   </div>`).join('');
 }
-function showJob(id){hideEl('jl-view');showEl('jd-view');openJobDetail(id,'profile');}
+function showJob(id){show('jobs');hideEl('jl-view');showEl('jd-view');openJobDetail(id,'profile');}
 function backJobs(){showEl('jl-view');hideEl('jd-view');renderJobs();}
 
 async function openJobDetail(jobId,tab){

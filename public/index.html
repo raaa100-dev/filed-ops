@@ -270,6 +270,7 @@ canvas.markup-canvas{border-radius:var(--rs);width:100%;touch-action:none;border
     <div style="display:flex;gap:8px;margin-bottom:8px">
       <button class="btn btn-sm" id="cam-btn-main" onclick="toggleCam('main')" style="flex:1">&#128247; Camera</button>
       <button class="btn btn-sm" id="torch-btn" onclick="toggleTorch()" style="flex:1;display:none">&#128294; Torch</button>
+      <button class="btn btn-sm" id="patch-btn" onclick="cyclePatchSize()" title="Scan sensitivity" style="flex-shrink:0">&#127919; Med</button>
     </div>
     <div class="fl">Or type / hardware scanner</div>
     <input type="text" id="s-part" placeholder="Barcode -- Enter to add" style="margin-bottom:6px" oninput="resolveBC(this.value,'s-resolve')" onkeydown="if(event.key==='Enter'){addToCart();this.value='';hideEl('s-resolve')}"/>
@@ -591,6 +592,17 @@ let CU=null,catalog={},jobs={},invData={},notifData=[],logData=[],ordParts=[],or
 let recent=JSON.parse(localStorage.getItem('wh_recent')||'[]');
 let cart={mode:'stage',items:{}};
 let camActive={},torchOn=false,torchTrack=null,scanCD=false;
+let currentPatchSize='medium';
+function cyclePatchSize(){
+  const sizes=['small','medium','large','x-large'];
+  const labels={small:'Small',medium:'Med',large:'Large','x-large':'X-Lg'};
+  const tips={small:'Best for small/dense barcodes',medium:'Default - most barcodes',large:'Best for large barcodes','x-large':'Very large barcodes'};
+  currentPatchSize=sizes[(sizes.indexOf(currentPatchSize)+1)%sizes.length];
+  const btn=document.getElementById('patch-btn');
+  if(btn)btn.textContent='\u{1F3AF} '+labels[currentPatchSize];
+  toast(tips[currentPatchSize],2000);
+  if(camActive['main']){stopCam('main');setTimeout(()=>startCam('main'),300);}
+}
 // ── PLAN EDITOR ─────────────────────────────────────────────────────────────
 let peCanvas=null,peCtx=null,peTool='draw',peColor='#E24B4A',peBrushSize=4,peDotSize=10,peFontSize=18;
 let peDrawing=false,peBaseImg=null,peHistory=[],pePendingTextPos=null;
@@ -706,16 +718,62 @@ function startCam(key){
   if(!wrap){wrap=document.createElement('div');wrap.id=e.wrap;wrap.style.marginBottom='8px';wrap.innerHTML='<div class="cam-wrap"><div id="'+e.prev+'"></div><div class="cam-overlay"><div class="scan-rect"><div class="scan-line"></div></div></div><div class="cam-status" id="'+e.status+'">Align barcode</div><div class="cam-det" id="'+e.det+'" style="display:none"><span id="'+e.detTxt+'"></span></div></div>';const btn=document.getElementById(e.btn);if(btn)btn.parentElement.insertAdjacentElement('afterend',wrap);}
   else wrap.style.display='block';
   const btn=document.getElementById(e.btn);if(btn)btn.textContent='\u23f9 Stop';
-  Quagga.init({inputStream:{type:'LiveStream',target:document.getElementById(e.prev),constraints:{facingMode:'environment'}},decoder:{readers:['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader','upc_e_reader','codabar_reader','i2of5_reader']},locate:true,numOfWorkers:2,frequency:10},err=>{
-    if(err){toast('Camera not available');stopCam(key);return;}
+  Quagga.init({
+    inputStream:{
+      type:'LiveStream',
+      target:document.getElementById(e.prev),
+      constraints:{
+        facingMode:'environment',
+        width:{min:640,ideal:1280,max:1920},
+        height:{min:480,ideal:720,max:1080},
+        focusMode:'continuous',
+        advanced:[{torch:false}]
+      },
+      area:{top:'15%',right:'5%',left:'5%',bottom:'15%'},
+    },
+    decoder:{
+      readers:['code_128_reader','ean_reader','upc_reader','code_39_reader','ean_8_reader','upc_e_reader'],
+      multiple:false
+    },
+    locator:{patchSize:currentPatchSize,halfSample:true},
+    locate:true,
+    numOfWorkers:Math.min(4,Math.max(2,(navigator.hardwareConcurrency||2)-1)),
+    frequency:15,
+  }, err=>{
+    if(err){toast('Camera error: '+(err.message||err));stopCam(key);return;}
     Quagga.start();camActive[key]=true;
     const st=document.getElementById(e.status);if(st)st.textContent='Align barcode in frame';
-    if(key==='main'){const tr=Quagga.CameraAccess.getActiveTrack();if(tr?.getCapabilities?.().torch){torchTrack=tr;showEl('torch-btn');}}
+    if(key==='main'){
+      setTimeout(()=>{const tr=Quagga.CameraAccess.getActiveTrack();if(tr?.getCapabilities?.().torch){torchTrack=tr;showEl('torch-btn');}},600);
+    }
   });
   Quagga.offDetected();
+
+  // Draw scan box feedback while scanning
+  Quagga.onProcessed(result=>{
+    const oc=Quagga.canvas?.dom?.overlay;if(!oc)return;
+    const ctx=oc.getContext('2d');ctx.clearRect(0,0,oc.width,oc.height);
+    if(result?.box)Quagga.ImageDebug.drawPath(result.box,{x:0,y:1},ctx,{color:'rgba(0,200,100,0.7)',lineWidth:2});
+    if(result?.codeResult?.code&&result?.line)Quagga.ImageDebug.drawPath(result.line,{x:'x',y:'y'},ctx,{color:'rgba(255,50,50,0.9)',lineWidth:3});
+  });
+
+  // Vote buffer — need same code read twice within 1.5s to confirm
+  const _votes={};
   Quagga.onDetected(result=>{
-    const code=result.codeResult.code;if(!code||scanCD)return;
-    scanCD=true;try{Quagga.stop();}catch(ex){}camActive[key]=false;
+    const code=result.codeResult?.code;if(!code||scanCD)return;
+    // Confidence check
+    const errs=(result.codeResult.decodedCodes||[]).filter(c=>c.error!=null).map(c=>c.error);
+    const avgErr=errs.length?errs.reduce((a,b)=>a+b,0)/errs.length:1;
+    if(avgErr>0.3){const st=document.getElementById(e.status);if(st)st.textContent='Hold steady...';return;}
+    // Vote
+    const now=Date.now();
+    if(!_votes[code]){_votes[code]={n:0,t:now};}
+    _votes[code].n++;
+    Object.keys(_votes).forEach(k=>{if(now-_votes[k].t>1500)delete _votes[k];});
+    if(_votes[code].n<2)return;
+    // Confirmed
+    scanCD=true;Object.keys(_votes).forEach(k=>delete _votes[k]);
+    try{Quagga.stop();}catch(ex){}camActive[key]=false;
     playBeep();if(navigator.vibrate)navigator.vibrate([60,40,60]);
     const det=document.getElementById(e.det),detTxt=document.getElementById(e.detTxt);
     if(det&&detTxt){detTxt.textContent='\u2713 '+code;det.style.display='block';setTimeout(()=>det.style.display='none',800);}
